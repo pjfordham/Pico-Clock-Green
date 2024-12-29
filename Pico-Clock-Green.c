@@ -8,10 +8,6 @@
 #include "hardware/adc.h"
 #include "hardware/i2c.h"
 #include "ziku.h"
-unsigned char month_date[2][12] = {
-    {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
-    {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30,
-     31}};                   //判断闰年和非闰年每个月的天数
 unsigned char disp_buf[112]; //缓冲区字节，对应24x8个点及滚动字节
 unsigned char CS_cnt;        //行选计数
 unsigned char UP_id = 0, UP_Key_flag = 0, KEY_Set_flag = 0,
@@ -1084,90 +1080,22 @@ void dis_scroll() {
     disp_buf[i] = (disp_buf[i] & (~0x03)) | save_buf; //复原功能位
   }
 }
-unsigned char get_month_date(uint16_t year_cnt,
-                             uint8_t month_cnt) //判断一个月的最大天数
-{
-  if ((year_cnt % 4 == 0 && year_cnt % 100 != 0) || year_cnt % 400 == 0) {
-    switch (month_cnt) {
-    case 1:
-      return month_date[0][0];
-      break;
-    case 2:
-      return month_date[0][1];
-      break;
-    case 3:
-      return month_date[0][2];
-      break;
-    case 4:
-      return month_date[0][3];
-      break;
-    case 5:
-      return month_date[0][4];
-      break;
-    case 6:
-      return month_date[0][5];
-      break;
-    case 7:
-      return month_date[0][6];
-      break;
-    case 8:
-      return month_date[0][7];
-      break;
-    case 9:
-      return month_date[0][8];
-      break;
-    case 10:
-      return month_date[0][9];
-      break;
-    case 11:
-      return month_date[0][10];
-      break;
-    case 12:
-      return month_date[0][11];
-      break;
-    }
 
-  } else {
-    switch (month_cnt) {
-    case 1:
-      return month_date[1][0];
-      break;
-    case 2:
-      return month_date[1][1];
-      break;
-    case 3:
-      return month_date[1][2];
-      break;
-    case 4:
-      return month_date[1][3];
-      break;
-    case 5:
-      return month_date[1][4];
-      break;
-    case 6:
-      return month_date[1][5];
-      break;
-    case 7:
-      return month_date[1][6];
-      break;
-    case 8:
-      return month_date[1][7];
-      break;
-    case 9:
-      return month_date[1][8];
-      break;
-    case 10:
-      return month_date[1][9];
-      break;
-    case 11:
-      return month_date[1][10];
-      break;
-    case 12:
-      return month_date[1][11];
-      break;
-    }
-  }
+static int is_leap_year(uint16_t year_cnt) {
+   return (year_cnt % 4 == 0 && year_cnt % 100 != 0) || year_cnt % 400 == 0;
 }
+
+unsigned char get_month_date(uint16_t year_cnt, uint8_t month_cnt)
+{  // Return the number of days in a given month for a given year.
+   static unsigned char month_date[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
+   if ( month_cnt == 2 && is_leap_year( year_cnt ) ) {
+      return 29;
+   } else {
+      return month_date[month_cnt - 1];
+   }
+}
+
 unsigned char get_weekday(uint16_t year_cnt, uint8_t month_cnt,
                           uint8_t date_cnt) //根据年月日判断星期几
 {
