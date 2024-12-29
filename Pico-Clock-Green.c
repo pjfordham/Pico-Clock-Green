@@ -61,12 +61,10 @@ void dis_Timing();  //计时模式设置
 void dis_alarm();   //闹钟模式设置
 void dis_scroll();  //滚动显示
 uint16_t get_ads1015();
-unsigned char get_month_date(uint16_t year,
-                             uint8_t month_cnt); //获取当年的月份天数
-unsigned char get_weekday(uint16_t year, uint8_t month_cnt,
-                          uint8_t date_cnt); //基姆拉尔森计算公式:Weekday=
-                                             //(day+2*mon+3*(mon+1)/5+year+year/4-year/100+year/400)
-                                             //% 7
+
+static unsigned char get_month_date(uint16_t year, uint8_t month_cnt);
+static unsigned char get_weekday(uint16_t year, uint8_t month_cnt, uint8_t date_cnt);
+
 void show_adc();
 void Alarm_set(uint8_t UP_DOWN_flag);
 void Timing_set(uint8_t UP_DOWN_flag);
@@ -1085,7 +1083,7 @@ static int is_leap_year(uint16_t year_cnt) {
    return (year_cnt % 4 == 0 && year_cnt % 100 != 0) || year_cnt % 400 == 0;
 }
 
-unsigned char get_month_date(uint16_t year_cnt, uint8_t month_cnt)
+static unsigned char get_month_date(uint16_t year_cnt, uint8_t month_cnt)
 {  // Return the number of days in a given month for a given year.
    static unsigned char month_date[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
@@ -1096,7 +1094,7 @@ unsigned char get_month_date(uint16_t year_cnt, uint8_t month_cnt)
    }
 }
 
-unsigned char get_weekday(uint16_t year_cnt, uint8_t month_cnt,
+static unsigned char get_weekday(uint16_t year_cnt, uint8_t month_cnt,
                           uint8_t date_cnt)
 {  // Use Zeller's Congrunece formula to calculate the weekday
    // TODO: Why do we add an extra 1?
