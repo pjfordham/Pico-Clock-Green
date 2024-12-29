@@ -1097,40 +1097,18 @@ unsigned char get_month_date(uint16_t year_cnt, uint8_t month_cnt)
 }
 
 unsigned char get_weekday(uint16_t year_cnt, uint8_t month_cnt,
-                          uint8_t date_cnt) //根据年月日判断星期几
-{
-  uint8_t weekday = 8;
-  if (month_cnt == 1 || month_cnt == 2) {
-    month_cnt += 12;
-    year_cnt--;
-  }
-  weekday = (date_cnt + 1 + 2 * month_cnt + 3 * (month_cnt + 1) / 5 + year_cnt +
-             year_cnt / 4 - year_cnt / 100 + year_cnt / 400) %
-            7;
-  switch (weekday) {
-  case 0:
-    return 7;
-    break;
-  case 1:
-    return 1;
-    break;
-  case 2:
-    return 2;
-    break;
-  case 3:
-    return 3;
-    break;
-  case 4:
-    return 4;
-    break;
-  case 5:
-    return 5;
-    break;
-  case 6:
-    return 6;
-    break;
-  }
+                          uint8_t date_cnt)
+{  // Use Zeller's Congrunece formula to calculate the weekday
+   // TODO: Why do we add an extra 1?
+   if (month_cnt <= 2) {
+      month_cnt += 12;
+      year_cnt--;
+   }
+   uint8_t weekday = (date_cnt + 1 + 2 * month_cnt + 3 * (month_cnt + 1) / 5 + year_cnt +
+                      year_cnt / 4 - year_cnt / 100 + year_cnt / 400) % 7;
+   return weekday == 0 ? 7 : weekday;
 }
+
 uint16_t get_ads1015() //获取光敏传感器的值
 {
   adc_select_input(0);
