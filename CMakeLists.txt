@@ -1,12 +1,24 @@
-add_executable(Pico-Clock-Green
+cmake_minimum_required(VERSION 3.18)
+
+include($ENV{PICO_SDK_PATH}/external/pico_sdk_import.cmake)
+
+project(Pico-Clock-Green C CXX ASM)
+
+set(CMAKE_C_STANDARD 11)
+
+pico_sdk_init()
+
+add_executable(${PROJECT_NAME}
         Pico-Clock-Green.c
         Ds3231.c Ds3231.h)
 
 # Pull in our pico_stdlib which pulls in commonly used features
-target_link_libraries(Pico-Clock-Green pico_stdlib hardware_i2c hardware_adc)
+target_link_libraries(${PROJECT_NAME} pico_stdlib hardware_i2c hardware_adc)
+
+# enable usb or uart output
+pico_enable_stdio_usb(${PROJECT_NAME} 1)
+pico_enable_stdio_uart(${PROJECT_NAME} 0)
 
 # create map/bin/hex file etc.
-pico_add_extra_outputs(Pico-Clock-Green)
+pico_add_extra_outputs(${PROJECT_NAME})
 
-# add url via pico_set_program_url
-example_auto_set_url(Pico-Clock-Green)
