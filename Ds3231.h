@@ -42,7 +42,6 @@ extern char stateOfTime[3];
 extern uint8_t DS3231_ReadReg[17];
 void init_DS3231();
 void Set_Time(uint8_t sec,uint8_t min,uint8_t hour, uint8_t dow,uint8_t dom,uint8_t month,uint8_t year);
-void Show_Time();
 void Set_alarm1_clock(uint8_t mode,uint8_t sec,uint8_t min,uint8_t hour,uint8_t data);
 void  Set_alarm2_clock(uint8_t min,uint8_t hour,uint8_t date);
 void DS3231_REG_Read();

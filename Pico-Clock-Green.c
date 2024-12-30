@@ -71,6 +71,8 @@ static void beep_stop_judge();
 static void Flashing_start_judge();
 static void adc_show_count();
 static void beep_start_judge();
+static void Show_Time();
+
 void EXIT();
 void Special_Exit();
 struct repeating_timer timer2;
@@ -656,7 +658,7 @@ static void display_char(unsigned char x, unsigned char dis_char) {
   }
 }
 
-void Show_Time() //显示时间
+static void Show_Time() //显示时间
 {
   Time_RTC = Read_RTC(); //获取RTC的值
   display_char(0, '1');
