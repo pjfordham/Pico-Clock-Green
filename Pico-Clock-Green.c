@@ -9,7 +9,6 @@
 #include "hardware/i2c.h"
 #include "ziku.h"
 unsigned char disp_buf[112]; //缓冲区字节，对应24x8个点及滚动字节
-unsigned char CS_cnt;        //行选计数
 unsigned char UP_id = 0, UP_Key_flag = 0, KEY_Set_flag = 0,
               No_operation_flag = 0, No_operation_count; //触发按键检测
 unsigned char adc_light_flag = 0, adc_light_time_flag = 0, light_set = 0;
@@ -328,6 +327,7 @@ bool repeating_timer_callback_ms(struct repeating_timer *t) { // 1ms进入一次
     } else
       Exit_cnt = 0;
   }
+  static unsigned char CS_cnt;        //行选计数
   CS_cnt++;
   if (CS_cnt > 7) {
     CS_cnt = 0;
