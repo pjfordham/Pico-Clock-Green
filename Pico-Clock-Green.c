@@ -41,7 +41,7 @@ unsigned char Time_set_mode_flag = 0, Time_set_mode_sta = 0, Full_time_flag = 0,
               Full_time_sta = 0, Full_time_alarm_count = 5; //整点报时、时间模式
 unsigned char i, jr, save_buf, adc_show_flag = 0, adc_show_time = 6;
 TIME_RTC Time_RTC;
-#define BAUD_RATE 115200
+
 unsigned char flag_Flashing[11] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                                    0xff, 0xff, 0xff, 0xff, 0xff};
 unsigned char temp_sta = 0;
