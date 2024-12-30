@@ -30,8 +30,7 @@ unsigned char alarm_select_flag = 0, alarm_open_flag = 0, alarm_select_sta = 0,
               dayofmonth_temp, year_high_temp = 20; //闹钟及时间
 unsigned char Min_count = 0, alarm_star_flag = 0, Timing_show_count = 0,
               Timing_show_sec = 0;
-uint16_t KEY_cnt = 0, UP_cnt = 0, Exit_cnt = 0, Flashing_count = 0, whole_year,
-         adc_count = 0, write_flag = 0;
+uint16_t  whole_year;
 unsigned char Timing_mode_flag = 0, Timing_mode_sta = 2, Timing_min_flag = 0,
               Timing_sec_flag = 0, Timing_min_temp = 0, Timing_sec_temp = 0,
               Timing_DN_flag = 0, Timing_UP_Key_flag = 0,
@@ -187,6 +186,7 @@ bool repeating_timer_callback_us(struct repeating_timer *t) // us
 }
 
 bool repeating_timer_callback_ms(struct repeating_timer *t) { // 1ms进入一次
+   static uint16_t Exit_cnt = 0, UP_cnt = 0, KEY_cnt = 0;
   unsigned char i;
   adc_show_count();
   beep_stop_judge();
@@ -1314,7 +1314,8 @@ static void Time_set(uint8_t UP_DOWN_flag) {
   }
 }
 static void adc_show_count() {
-  if (adc_light_flag != 0) {
+   static uint16_t adc_count=0;
+   if (adc_light_flag != 0) {
     adc_light_count++;
     if (adc_light_count == 1000) {
       adc_light_count = 0;
@@ -1340,7 +1341,8 @@ static void beep_stop_judge() {
   }
 }
 static void Flashing_start_judge() {
-  if (set_id != 0) {
+   static uint16_t Flashing_count = 0;
+   if (set_id != 0) {
     Flashing_count++;
     if (Flashing_count == 600) {
       Flashing_count = 0;
