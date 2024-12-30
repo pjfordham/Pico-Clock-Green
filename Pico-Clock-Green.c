@@ -44,9 +44,8 @@ TIME_RTC Time_RTC;
 #define BAUD_RATE 115200
 unsigned char flag_Flashing[11] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                                    0xff, 0xff, 0xff, 0xff, 0xff};
-unsigned char temp_high, temp_low, temp_sta = 0, get_add_high = 0x11,
-                                   get_add_low = 0x12;
-void get_temperature();
+unsigned char temp_sta = 0;
+
 void display_char(unsigned char x,
                   unsigned char dis_char); //对需要显示的数据进行存放
 void send_data(unsigned char data);
@@ -1011,19 +1010,18 @@ void dis_Timing() {
   }
 }
 
-void get_temperature() {
-  unsigned char start_tran[2] = {0x0E, 0x20};
-  i2c_write_blocking(I2C_PORT, Address, start_tran, 2, false);
-  i2c_write_blocking(I2C_PORT, Address, &get_add_high, 1, true);
-  i2c_read_blocking(I2C_PORT, Address, &temp_high, 1, false);
-  i2c_write_blocking(I2C_PORT, Address, &get_add_low, 1, true);
-  i2c_read_blocking(I2C_PORT, Address, &temp_low, 1, false);
-  temp_low = (temp_low >> 6) * 25; //放大分辨率
-}
 void dis_scroll() {
 
   if (scroll_show_flag == 1) {
-    get_temperature();
+     unsigned char temp_high, temp_low, get_add_high = 0x11, get_add_low = 0x12;
+     unsigned char start_tran[2] = {0x0E, 0x20};
+     i2c_write_blocking(I2C_PORT, Address, start_tran, 2, false);
+     i2c_write_blocking(I2C_PORT, Address, &get_add_high, 1, true);
+     i2c_read_blocking(I2C_PORT, Address, &temp_high, 1, false);
+     i2c_write_blocking(I2C_PORT, Address, &get_add_low, 1, true);
+     i2c_read_blocking(I2C_PORT, Address, &temp_low, 1, false);
+     temp_low = (temp_low >> 6) * 25; //放大分辨率
+
     display_char(32, '2');
     display_char(37, '0');
     display_char(42, (year_temp / 10 + 0x30));
