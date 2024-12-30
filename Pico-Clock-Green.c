@@ -39,7 +39,6 @@ unsigned char Timing_mode_flag = 0, Timing_mode_sta = 2, Timing_min_flag = 0,
               Timing_DN_close_flag = 0; //计时
 unsigned char Time_set_mode_flag = 0, Time_set_mode_sta = 0, Full_time_flag = 0,
               Full_time_sta = 0, Full_time_alarm_count = 5; //整点报时、时间模式
-char Time_buf[4];
 unsigned char i, jr, save_buf, adc_show_flag = 0, adc_show_time = 6;
 TIME_RTC Time_RTC;
 #define BAUD_RATE 115200
@@ -692,18 +691,19 @@ void Show_Time() //显示时间
     hour_temp = Set_hour_temp;
   }
 
-  Time_buf[0] = ((hour_temp / 10) + '0');
-  Time_buf[1] = ((hour_temp % 10) + '0');
-  Time_buf[2] = ((Time_RTC.minutes / 16) + '0');
-  Time_buf[3] = ((Time_RTC.minutes % 16) + '0');
   Min_count = ((float)Time_RTC.seconds) / 1.5; //计算当前RTC的秒数
 
   if (scroll_start == 0) {
-    display_char(0, Time_buf[0]);
-    display_char(5, Time_buf[1]);
-    display_char(10, ':');
-    display_char(13, Time_buf[2]);
-    display_char(18, Time_buf[3]);
+     char Time_buf[4];
+     Time_buf[0] = ((hour_temp / 10) + '0');
+     Time_buf[1] = ((hour_temp % 10) + '0');
+     Time_buf[2] = ((Time_RTC.minutes / 16) + '0');
+     Time_buf[3] = ((Time_RTC.minutes % 16) + '0');
+     display_char(0, Time_buf[0]);
+     display_char(5, Time_buf[1]);
+     display_char(10, ':');
+     display_char(13, Time_buf[2]);
+     display_char(18, Time_buf[3]);
   }
   if (Time_RTC.dayofweek == 1) {
     select_weekday(0);
