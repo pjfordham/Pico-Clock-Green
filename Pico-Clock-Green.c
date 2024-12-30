@@ -11,7 +11,7 @@
 unsigned char disp_buf[112]; //缓冲区字节，对应24x8个点及滚动字节
 unsigned char UP_id = 0, UP_Key_flag = 0, KEY_Set_flag = 0,
               No_operation_flag = 0, No_operation_count; //触发按键检测
-unsigned char adc_light_flag = 0, adc_light_time_flag = 0, light_set = 0;
+unsigned char adc_light_flag = 0, adc_light_time_flag = 0;
 uint16_t adc_light, adc_light_count = 0; //设置自动亮度
 unsigned char set_id = 0, update_time = 0, scroll_start_count = 0,
               scroll_show_flag = 0, scroll_show_start = 0;
@@ -172,7 +172,8 @@ int main(void) {
 }
 bool repeating_timer_callback_us(struct repeating_timer *t) // us
 {
-  if (adc_light > 2800) {
+   static unsigned char light_set = 0;
+   if (adc_light > 2800) {
     light_set++;
     if (light_set == 3) {
       OE_OPEN;
