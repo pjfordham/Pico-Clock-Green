@@ -45,36 +45,36 @@ unsigned char flag_Flashing[11] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                                    0xff, 0xff, 0xff, 0xff, 0xff};
 unsigned char temp_sta = 0;
 
-void display_char(unsigned char x,
+static void display_char(unsigned char x,
                   unsigned char dis_char); //对需要显示的数据进行存放
-void send_data(unsigned char data);
-void cls_disp(unsigned char x); //清数据
-void select_weekday(unsigned char x);
+static void send_data(unsigned char data);
+static void cls_disp(unsigned char x); //清数据
+static void select_weekday(unsigned char x);
 bool repeating_timer_callback_ms(struct repeating_timer *t); // 1ms回调函数
 bool repeating_timer_callback_s(struct repeating_timer *t);  // 1s 回调函数
 bool repeating_timer_callback_us(struct repeating_timer *t);
-void dis_SetMode(); //普通模式设置
-void dis_Timing();  //计时模式设置
-void dis_alarm();   //闹钟模式设置
-void dis_scroll();  //滚动显示
-uint16_t get_ads1015();
+static void dis_SetMode(); //普通模式设置
+static void dis_Timing();  //计时模式设置
+static void dis_alarm();   //闹钟模式设置
+static void dis_scroll();  //滚动显示
+static uint16_t get_ads1015();
 
 static unsigned char get_month_date(uint16_t year, uint8_t month_cnt);
 static unsigned char get_weekday(uint16_t year, uint8_t month_cnt, uint8_t date_cnt);
 
-void show_adc();
-void Alarm_set(uint8_t UP_DOWN_flag);
-void Timing_set(uint8_t UP_DOWN_flag);
-void Time_set(uint8_t UP_DOWN_flag);
-void scroll_show_judge();
-void beep_stop_judge();
-void Flashing_start_judge();
-void adc_show_count();
-void beep_start_judge();
+static void show_adc();
+static void Alarm_set(uint8_t UP_DOWN_flag);
+static void Timing_set(uint8_t UP_DOWN_flag);
+static void Time_set(uint8_t UP_DOWN_flag);
+static void scroll_show_judge();
+static void beep_stop_judge();
+static void Flashing_start_judge();
+static void adc_show_count();
+static void beep_start_judge();
 void EXIT();
 void Special_Exit();
 struct repeating_timer timer2;
-int port_init(void) // GPIO初始化
+static int port_init(void) // GPIO初始化
 {
   stdio_init_all();
   gpio_init(A0);
@@ -477,7 +477,7 @@ bool repeating_timer_callback_s(struct repeating_timer *t) // 1s 进入一次
   return true;
 }
 
-void show_adc() {
+static void show_adc() {
   const float conversion_factor = 3.3f / (1 << 12); //计算电压
   uint16_t result = adc_read();
   float voltage = 3 * result * conversion_factor;
@@ -491,7 +491,7 @@ void show_adc() {
   display_char(17, 'U');
 }
 
-void select_weekday(unsigned char x) //显示星期几
+static void select_weekday(unsigned char x) //显示星期几
 {
   switch (x) {
   case 0:
@@ -560,14 +560,14 @@ void select_weekday(unsigned char x) //显示星期几
   }
 }
 
-void cls_disp(unsigned char x) //清除x位置后的显示内容
+static void cls_disp(unsigned char x) //清除x位置后的显示内容
 {
   do {
     display_char(x, ' ');
     x += 8;
   } while (x < sizeof(disp_buf));
 }
-void send_data(unsigned char data) //发送数据函数
+static void send_data(unsigned char data) //发送数据函数
 {
   unsigned char i;
   for (i = 0; i < 8; i++) {
@@ -583,7 +583,7 @@ void send_data(unsigned char data) //发送数据函数
   }
 }
 
-void display_char(unsigned char x, unsigned char dis_char) {
+static void display_char(unsigned char x, unsigned char dis_char) {
   unsigned char i, j, k;
   x += disp_offset; //加上状态指示灯的偏移
   j = x / 8;        //要显示是第几个点阵序号
@@ -719,7 +719,7 @@ void Show_Time() //显示时间
   } else
     select_weekday(6);
 }
-void dis_SetMode() {
+static void dis_SetMode() {
   if (set_id < 3) //设置小时和分钟
   {
     if (set_id == 1) {
@@ -828,7 +828,7 @@ void dis_SetMode() {
   }
 }
 
-void dis_alarm() {
+static void dis_alarm() {
   if (set_id == 1 || set_id == 2) {
     if (set_id == 1) {
       alarm_select_flag = 1;
@@ -909,7 +909,7 @@ void dis_alarm() {
   }
 }
 
-void dis_Timing() {
+static void dis_Timing() {
   if (set_id == 1) {
     Timing_mode_flag = 1;
     display_char(0, 'T');
@@ -1010,7 +1010,7 @@ void dis_Timing() {
   }
 }
 
-void dis_scroll() {
+static void dis_scroll() {
 
   if (scroll_show_flag == 1) {
      unsigned char temp_high, temp_low, get_add_high = 0x11, get_add_low = 0x12;
@@ -1105,13 +1105,14 @@ static unsigned char get_weekday(uint16_t year_cnt, uint8_t month_cnt,
    return weekday == 0 ? 7 : weekday;
 }
 
-uint16_t get_ads1015() //获取光敏传感器的值
+static uint16_t get_ads1015() //获取光敏传感器的值
 {
   adc_select_input(0);
   uint16_t value = adc_read();
   return value;
 }
-void Alarm_set(uint8_t UP_DOWN_flag) {
+
+static void Alarm_set(uint8_t UP_DOWN_flag) {
   if (alarm_hour_flag == 1) //闹钟时钟可设置标志位
   {
     if (UP_DOWN_flag == UP_flag) {
@@ -1160,7 +1161,8 @@ void Alarm_set(uint8_t UP_DOWN_flag) {
     }
   }
 }
-void Timing_set(uint8_t UP_DOWN_flag) {
+
+static void Timing_set(uint8_t UP_DOWN_flag) {
   if (Timing_mode_flag == 1) {
     if (UP_DOWN_flag == UP_flag) {
       Timing_mode_sta++;
@@ -1218,7 +1220,8 @@ void Timing_set(uint8_t UP_DOWN_flag) {
     }
   }
 }
-void Time_set(uint8_t UP_DOWN_flag) {
+
+static void Time_set(uint8_t UP_DOWN_flag) {
   if (Set_time_hour_flag == 1) //小时设置
   {
     change_time_flag = 1;
@@ -1308,7 +1311,7 @@ void Time_set(uint8_t UP_DOWN_flag) {
     }
   }
 }
-void adc_show_count() {
+static void adc_show_count() {
   if (adc_light_flag != 0) {
     adc_light_count++;
     if (adc_light_count == 1000) {
@@ -1324,7 +1327,7 @@ void adc_show_count() {
     }
   }
 }
-void beep_stop_judge() {
+static void beep_stop_judge() {
   if (beep_on_flag == 1) {
     beep_on_count++;
     if (beep_on_count == 80) {
@@ -1334,7 +1337,7 @@ void beep_stop_judge() {
     }
   }
 }
-void Flashing_start_judge() {
+static void Flashing_start_judge() {
   if (set_id != 0) {
     Flashing_count++;
     if (Flashing_count == 600) {
@@ -1350,7 +1353,7 @@ void Flashing_start_judge() {
     }
   }
 }
-void scroll_show_judge() {
+static void scroll_show_judge() {
   if (scroll_start == 1) //每3分钟滚动一次
   {
     scroll_start_count++;
@@ -1431,7 +1434,7 @@ void Special_Exit() {
   update_time = 1;
   scroll_count = 0;
 }
-void beep_start_judge() {
+static void beep_start_judge() {
   if (beep_sta == 1) {
     gpio_put(BUZZ, 1);
     beep_on_flag = 1;
