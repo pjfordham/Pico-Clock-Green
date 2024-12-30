@@ -38,7 +38,7 @@ unsigned char Timing_mode_flag = 0, Timing_mode_sta = 2, Timing_min_flag = 0,
               Timing_DN_close_flag = 0; //计时
 unsigned char Time_set_mode_flag = 0, Time_set_mode_sta = 0, Full_time_flag = 0,
               Full_time_sta = 0, Full_time_alarm_count = 5; //整点报时、时间模式
-unsigned char i, jr, save_buf, adc_show_flag = 0, adc_show_time = 6;
+unsigned char i, jr, adc_show_flag = 0, adc_show_time = 6;
 TIME_RTC Time_RTC;
 
 unsigned char flag_Flashing[11] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -1064,7 +1064,7 @@ void dis_scroll() {
     display_char(54, Time_RTC.minutes % 16 + 0x30);
   }
   for (i = 1; i < 8; i++) {
-    save_buf = disp_buf[i] & 0x03; //保留功能位
+    unsigned char save_buf = disp_buf[i] & 0x03; //保留功能位
     for (jr = 0; jr < sizeof(disp_buf) / 8; jr++) {
 
       if (jr < sizeof(disp_buf) / 8 - 1)
