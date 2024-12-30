@@ -73,8 +73,8 @@ static void adc_show_count();
 static void beep_start_judge();
 static void Show_Time();
 
-void EXIT();
-void Special_Exit();
+static void EXIT();
+static void Special_Exit();
 struct repeating_timer timer2;
 static int port_init(void) // GPIO初始化
 {
@@ -1375,7 +1375,7 @@ static void scroll_show_judge() {
     scroll_start_count = 0;
   }
 }
-void EXIT() {
+static void EXIT() {
   if (Set_time_hour_flag == 1 && change_time_flag == 1) {
     set_hour(Set_hour_temp);
   }
@@ -1426,7 +1426,7 @@ void EXIT() {
   Set_time_dayofmonth_flag = 0;
   change_time_flag = 0;
 }
-void Special_Exit() {
+static void Special_Exit() {
   No_operation_flag = 0;
   KEY_Set_flag = 0;
   alarm_flag = 0;
