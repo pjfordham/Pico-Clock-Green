@@ -682,16 +682,11 @@ static void Show_Time() //显示时间
   Min_count = ((float)Time_RTC.seconds) / 1.5; //计算当前RTC的秒数
 
   if (scroll_start == 0) {
-     char Time_buf[4];
-     Time_buf[0] = ((hour_temp / 10) + '0');
-     Time_buf[1] = ((hour_temp % 10) + '0');
-     Time_buf[2] = ((Time_RTC.minutes / 16) + '0');
-     Time_buf[3] = ((Time_RTC.minutes % 16) + '0');
-     display_char(0, Time_buf[0]);
-     display_char(5, Time_buf[1]);
+     display_char(0, ((hour_temp / 10) + '0'));
+     display_char(5, ((hour_temp % 10) + '0'));
      display_char(10, ':');
-     display_char(13, Time_buf[2]);
-     display_char(18, Time_buf[3]);
+     display_char(13, ((Time_RTC.minutes / 16) + '0'));
+     display_char(18, ((Time_RTC.minutes % 16) + '0'));
   }
   select_weekday(Time_RTC.dayofweek);
 }
