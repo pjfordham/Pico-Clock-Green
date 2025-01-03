@@ -84,24 +84,8 @@ typedef enum
     ALARM_MODE_SEC_MATCHED,
     ALARM_MODE_ONCE_PER_SECOND
 } AlarmMode;
-//----------------星期LED指示灯定义-------------------------
 
 
-
-#define Monday          {disp_buf[0]|=(1<<3)|(1<<4);}
-#define DisMonday       {disp_buf[0] &= ~((1<<3)|(1<<4));}
-#define Tuesday         {disp_buf[0]|=(1<<6)|(1<<7);}
-#define DisTuesday      {disp_buf[0] &= ~((1<<6)|(1<<7));}
-#define Wednesday       {disp_buf[8]|=(1<<1)|(1<<2);}
-#define DisWednesday    {disp_buf[8] &= ~((1<<1)|(1<<2));}
-#define Thursday        {disp_buf[8]|=(1<<4)|(1<<5);}
-#define DisThursday     {disp_buf[8] &= ~((1<<4)|(1<<5));}
-#define Friday          {disp_buf[8]|=(1<<7);disp_buf[16]|=(1<<0);}
-#define DisFriday        {disp_buf[8] &= ~(1<<7);disp_buf[16] &= ~(1<<0);}
-#define Saturday        {disp_buf[16]|=(1<<2)|(1<<3);}
-#define DisSaturday     {disp_buf[16]&= ~((1<<2)|(1<<3));}
-#define Sunday          {disp_buf[16]|=(1<<5)|(1<<6);}
-#define DisSunday       {disp_buf[16] &= ~((1<<5)|(1<<6));}
 //----------------状态LED指示灯定义-------------------------
 #define dis_move_open           disp_buf[0]|= 0X03
 #define dis_move_close          disp_buf[0] &= ~0X03

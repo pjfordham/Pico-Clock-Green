@@ -193,6 +193,8 @@ bool repeating_timer_callback_ms(struct repeating_timer *t) { // 1ms进入一次
   beep_stop_judge();
   Flashing_start_judge();
   scroll_show_judge();
+  // this is reading and debouncing the buttons and possibly
+  // detecting long press?
   if (gpio_get(SET_FUNCTION) == 0) //检测设置按钮是否被按下
   {
     KEY_cnt++;
@@ -494,73 +496,54 @@ static void show_adc() {
   display_char(17, 'U');
 }
 
+#define Monday          {disp_buf[0]|=(1<<3)|(1<<4);}
+#define DisMonday       {disp_buf[0] &= ~((1<<3)|(1<<4));}
+#define Tuesday         {disp_buf[0]|=(1<<6)|(1<<7);}
+#define DisTuesday      {disp_buf[0] &= ~((1<<6)|(1<<7));}
+#define Wednesday       {disp_buf[8]|=(1<<1)|(1<<2);}
+#define DisWednesday    {disp_buf[8] &= ~((1<<1)|(1<<2));}
+#define Thursday        {disp_buf[8]|=(1<<4)|(1<<5);}
+#define DisThursday     {disp_buf[8] &= ~((1<<4)|(1<<5));}
+#define Friday          {disp_buf[8]|=(1<<7);disp_buf[16]|=(1<<0);}
+#define DisFriday       {disp_buf[8] &= ~(1<<7);disp_buf[16] &= ~(1<<0);}
+#define Saturday        {disp_buf[16]|=(1<<2)|(1<<3);}
+#define DisSaturday     {disp_buf[16]&= ~((1<<2)|(1<<3));}
+#define Sunday          {disp_buf[16]|=(1<<5)|(1<<6);}
+#define DisSunday       {disp_buf[16] &= ~((1<<5)|(1<<6));}
+
 static void select_weekday(unsigned char x) //显示星期几
 {
-  switch (x) {
-  case 0:
-    Monday;
-    DisTuesday;
-    DisWednesday;
-    DisThursday;
-    DisFriday;
-    DisSaturday;
-    DisSunday;
-    break;
-  case 1:
-    DisMonday;
-    Tuesday;
-    DisWednesday;
-    DisThursday;
-    DisFriday;
-    DisSaturday;
-    DisSunday;
-    break;
-  case 2:
-    DisMonday;
-    DisTuesday;
-    Wednesday;
-    DisThursday;
-    DisFriday;
-    DisSaturday;
-    DisSunday;
-    break;
-  case 3:
-    DisMonday;
-    DisTuesday;
-    DisWednesday;
-    Thursday;
-    DisFriday;
-    DisSaturday;
-    DisSunday;
-    break;
-  case 4:
-    DisMonday;
-    DisTuesday;
-    DisWednesday;
-    DisThursday;
-    Friday;
-    DisSaturday;
-    DisSunday;
-    break;
-  case 5:
-    DisMonday;
-    DisTuesday;
-    DisWednesday;
-    DisThursday;
-    DisFriday;
-    Saturday;
-    DisSunday;
-    break;
-  case 6:
-    DisMonday;
-    DisTuesday;
-    DisWednesday;
-    DisThursday;
-    DisFriday;
-    DisSaturday;
-    Sunday;
-    break;
-  }
+   DisSunday;
+   DisMonday;
+   DisTuesday;
+   DisWednesday;
+   DisThursday;
+   DisFriday;
+   DisSaturday;
+
+   switch (x) {
+   case 0:
+      Monday;
+      break;
+   case 1:
+      Tuesday;
+      break;
+   case 2:
+      Wednesday;
+      break;
+   case 3:
+      Thursday;
+      break;
+   case 4:
+      Friday;
+      break;
+   case 5:
+      Saturday;
+      break;
+   case 6:
+      Sunday;
+      break;
+   }
 }
 
 static void cls_disp(unsigned char x) //清除x位置后的显示内容
