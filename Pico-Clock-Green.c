@@ -20,7 +20,7 @@ unsigned char alarm_id = 0, alarm_flag = 0, beep_sta = 1, beep_flag = 0,
               scroll_sta = 0, scroll_count = 0, scroll_start = 0; //蜂鸣器及滚动
 unsigned char alarm_hour_temp = 0, alarm_min_temp = 0, alarm_hour_flag = 0,
               alarm_min_flag = 0, alarm_day_select_flag = 0,
-              alarm_day_select = 1;
+              alarm_day_select = 0;
 unsigned char Set_time_hour_flag = 0, Set_time_min_flag = 0,
               Set_time_year_flag = 0, Set_time_month_flag = 0,
               Set_time_dayofmonth_flag = 0, Set_hour_temp = 0, Set_min_temp = 0,
@@ -543,6 +543,9 @@ static void select_weekday(unsigned char x) //显示星期几
    case 6:
       Sunday;
       break;
+   default:
+      // Should leave day blank
+      break;
    }
 }
 
@@ -649,7 +652,7 @@ static void Show_Time() //显示时间
   Time_RTC.seconds = Time_RTC.seconds & 0x7F;
   Time_RTC.minutes = Time_RTC.minutes & 0x7F;
   Time_RTC.hour = Time_RTC.hour & 0x3F;
-  Time_RTC.dayofweek = Time_RTC.dayofweek & 0x07;
+  Time_RTC.dayofweek = (Time_RTC.dayofweek & 0x07) - 1;
   Time_RTC.dayofmonth = Time_RTC.dayofmonth & 0x3F;
   Time_RTC.month = Time_RTC.month & 0x1F;
   Set_hour_temp = BCD_to_Byte(Time_RTC.hour);
@@ -690,20 +693,7 @@ static void Show_Time() //显示时间
      display_char(13, Time_buf[2]);
      display_char(18, Time_buf[3]);
   }
-  if (Time_RTC.dayofweek == 1) {
-    select_weekday(0);
-  } else if (Time_RTC.dayofweek == 2) {
-    select_weekday(1);
-  } else if (Time_RTC.dayofweek == 3) {
-    select_weekday(2);
-  } else if (Time_RTC.dayofweek == 4) {
-    select_weekday(3);
-  } else if (Time_RTC.dayofweek == 5) {
-    select_weekday(4);
-  } else if (Time_RTC.dayofweek == 6) {
-    select_weekday(5);
-  } else
-    select_weekday(6);
+  select_weekday(Time_RTC.dayofweek);
 }
 static void dis_SetMode() {
   if (set_id < 3) //设置小时和分钟
@@ -853,22 +843,8 @@ static void dis_alarm() {
     cls_disp(26);
 
   } else if (set_id == 5) {
-    alarm_day_select_flag = 1;
-    if (alarm_day_select == 1) {
-      select_weekday(0);
-    } else if (alarm_day_select == 2) {
-      select_weekday(1);
-    } else if (alarm_day_select == 3) {
-      select_weekday(2);
-    } else if (alarm_day_select == 4) {
-      select_weekday(3);
-    } else if (alarm_day_select == 5) {
-      select_weekday(4);
-    } else if (alarm_day_select == 6) {
-      select_weekday(5);
-    } else {
-      select_weekday(6);
-    }
+     alarm_day_select_flag = 1;
+     select_weekday(alarm_day_select);
 
   } else {
     if (alarm_select_sta == 0 && alarm_open_sta != 0) {
@@ -1081,12 +1057,11 @@ static unsigned char get_month_date(uint16_t year_cnt, uint8_t month_cnt)
 static unsigned char get_weekday(uint16_t year_cnt, uint8_t month_cnt,
                           uint8_t date_cnt)
 {  // Use Zeller's Congrunece formula to calculate the weekday
-   // TODO: Why do we add an extra 1?
    if (month_cnt <= 2) {
       month_cnt += 12;
       year_cnt--;
    }
-   uint8_t weekday = (date_cnt + 1 + 2 * month_cnt + 3 * (month_cnt + 1) / 5 + year_cnt +
+   uint8_t weekday = (date_cnt + 2 * month_cnt + 3 * (month_cnt + 1) / 5 + year_cnt +
                       year_cnt / 4 - year_cnt / 100 + year_cnt / 400) % 7;
    return weekday == 0 ? 7 : weekday;
 }
@@ -1136,15 +1111,17 @@ static void Alarm_set(uint8_t UP_DOWN_flag) {
     alarm_select_sta = !alarm_select_sta;
   }
   if (alarm_day_select_flag == 1) {
-    if (UP_DOWN_flag == UP_flag) {
-      alarm_day_select++;
-      if (alarm_day_select == 8)
-        alarm_day_select = 1;
-    } else {
-      alarm_day_select--;
-      if (alarm_day_select == 0)
-        alarm_day_select = 7;
-    }
+     if (UP_DOWN_flag == UP_flag) {
+        if (alarm_day_select == 6)
+           alarm_day_select = 0;
+        else
+           alarm_day_select++;
+     } else {
+        if (alarm_day_select == 0)
+           alarm_day_select = 6;
+        else
+           alarm_day_select--;
+     }
   }
 }
 
@@ -1371,17 +1348,17 @@ static void EXIT() {
   if (Set_time_year_flag == 1 && change_time_flag == 1) {
     set_year(year_temp);
     set_dayofweekday(get_weekday(whole_year, month_temp, dayofmonth_temp));
-    select_weekday(get_weekday(whole_year, month_temp, dayofmonth_temp) - 1);
+    select_weekday(get_weekday(whole_year, month_temp, dayofmonth_temp));
   }
   if (Set_time_month_flag == 1 && change_time_flag == 1) {
     set_month(month_temp);
     set_dayofweekday(get_weekday(whole_year, month_temp, dayofmonth_temp));
-    select_weekday(get_weekday(whole_year, month_temp, dayofmonth_temp) - 1);
+    select_weekday(get_weekday(whole_year, month_temp, dayofmonth_temp));
   }
   if (Set_time_dayofmonth_flag == 1 && change_time_flag == 1) {
     set_dayofmouth(dayofmonth_temp);
     set_dayofweekday(get_weekday(whole_year, month_temp, dayofmonth_temp));
-    select_weekday(get_weekday(whole_year, month_temp, dayofmonth_temp) - 1);
+    select_weekday(get_weekday(whole_year, month_temp, dayofmonth_temp));
   }
   flag_Flashing[set_id] = 0xff;
   if (alarm_min_flag == 1) //防止显示为空
