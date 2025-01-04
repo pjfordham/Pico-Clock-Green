@@ -7,12 +7,13 @@
 #include "Ds3231.h"
 #include "hardware/adc.h"
 #include "hardware/i2c.h"
+#include "hardware/sync.h"
 #include "ziku.h"
 
 unsigned char disp_buf[112];
 
 static bool repeating_timer_callback_ms(struct repeating_timer *t);
-static bool repeating_timer_callback_s(struct repeating_timer *t);
+
 static void display_char(unsigned char x, unsigned char dis_char);
 static void Show_Time();
 static void send_data(unsigned char data);
@@ -63,17 +64,35 @@ static int port_init(void)
    adc_select_input(3);
 }
 
+int show_time = 0;
+void gpio_callback(uint gpio, uint32_t events) {
+   if(gpio==SQW) {
+      show_time = 1;
+   } else {
+   }
+}
+
 int main(void) {
    port_init();
+
+   init_DS3231();
+
+   gpio_set_irq_enabled_with_callback(SQW, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
+
+   Set_alarm1_clock( ALARM_MODE_ONCE_PER_SECOND, 0,0,0,0 );
 
    struct repeating_timer timer;
    struct repeating_timer timer1;
 
    add_repeating_timer_ms(1, repeating_timer_callback_ms, NULL, &timer);
-   add_repeating_timer_ms(1000, repeating_timer_callback_s, NULL, &timer1);
 
    absolute_time_t timeout_time = make_timeout_time_ms(50);
    while (1) {
+      if (show_time) {
+         Show_Time();
+         Ds3231_check_alarm();
+         show_time = 0;
+      }
       best_effort_wfe_or_timeout(timeout_time);
    }
    return 0;
@@ -144,12 +163,6 @@ bool repeating_timer_callback_ms(struct repeating_timer *t) {
    else
       A2_LOW;
 
-   return true;
-}
-
-bool repeating_timer_callback_s(struct repeating_timer *t)
-{
-   Show_Time();
    return true;
 }
 
@@ -230,7 +243,8 @@ static void cls_disp(unsigned char x)
 
 static void send_data(unsigned char data)
 {
-   unsigned char i;
+ uint32_t x =  save_and_disable_interrupts();
+  unsigned char i;
    for (i = 0; i < 8; i++) {
       CLK_LOW;
 
@@ -242,6 +256,7 @@ static void send_data(unsigned char data)
 
       CLK_HIGH;
    }
+   restore_interrupts(x);
 }
 
 static void display_char(unsigned char x, unsigned char dis_char) {
