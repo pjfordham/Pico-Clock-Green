@@ -72,7 +72,7 @@ int main(void) {
    add_repeating_timer_ms(1, repeating_timer_callback_ms, NULL, &timer);
    add_repeating_timer_ms(1000, repeating_timer_callback_s, NULL, &timer1);
 
-   absolute_time_t timeout_time = make_timeout_time_us(50000);
+   absolute_time_t timeout_time = make_timeout_time_ms(50);
    while (1) {
       best_effort_wfe_or_timeout(timeout_time);
    }
