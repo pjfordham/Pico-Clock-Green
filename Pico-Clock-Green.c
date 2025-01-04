@@ -84,32 +84,36 @@ bool repeating_timer_callback_ms(struct repeating_timer *t) {
    static uint16_t KEY_cnt = 0;
    if (gpio_get(SET_FUNCTION) == 0) {
       KEY_cnt++;
-   } else if (KEY_cnt > 50 && KEY_cnt < 300) {
-      KEY_cnt = 0;
-   } else if (KEY_cnt > 300) {
    } else {
+      if (KEY_cnt > 50 && KEY_cnt < 300) {
+         // Short press action
+      } else if (KEY_cnt > 300) {
+         // Long press action
+      }
       KEY_cnt = 0;
    }
 
    static uint16_t UP_cnt = 0;
    if (gpio_get(UP) == 0) {
       UP_cnt++;
-   } else if (UP_cnt > 50 && UP_cnt < 300) {
-      UP_cnt = 0;
-   } else if (UP_cnt > 300 ) {
-      UP_cnt = 0;
    } else {
+      if (UP_cnt > 50 && UP_cnt < 300) {
+         // Short press action
+      } else if (UP_cnt > 300 ) {
+         // Long press action
+      }
       UP_cnt = 0;
    }
 
    static uint16_t Exit_cnt = 0;
    if (gpio_get(DOWN) == 0) {
       Exit_cnt++;
-   } else if (Exit_cnt > 0 && Exit_cnt < 300) {
-      Exit_cnt = 0;
-   } else if (Exit_cnt > 300) {
-      Exit_cnt = 0;
    } else {
+      if (Exit_cnt > 50 && Exit_cnt < 300) {
+         // Short press action
+      } else if (Exit_cnt > 300) {
+         // Long press action
+      }
       Exit_cnt = 0;
    }
 
