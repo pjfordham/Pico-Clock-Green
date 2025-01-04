@@ -11,8 +11,8 @@
 
 unsigned char disp_buf[112];
 
-bool repeating_timer_callback_ms(struct repeating_timer *t);
-bool repeating_timer_callback_s(struct repeating_timer *t);
+static bool repeating_timer_callback_ms(struct repeating_timer *t);
+static bool repeating_timer_callback_s(struct repeating_timer *t);
 static void display_char(unsigned char x, unsigned char dis_char);
 static void Show_Time();
 static void send_data(unsigned char data);
@@ -141,19 +141,19 @@ bool repeating_timer_callback_ms(struct repeating_timer *t) {
    return true;
 }
 
-bool repeating_timer_callback_s(struct repeating_timer *t) // 1s 进入一次
+bool repeating_timer_callback_s(struct repeating_timer *t)
 {
    Show_Time();
    return true;
 }
 
 static void show_adc() {
-   const float conversion_factor = 3.3f / (1 << 12); //计算电压
+   const float conversion_factor = 3.3f / (1 << 12);
    uint16_t result = adc_read();
    float voltage = 3 * result * conversion_factor;
-   uint8_t Single_digit = (int)voltage;            //个位数
-   uint8_t Decile = (int)(voltage * 10) % 10;      //十分位
-   uint8_t Percentile = (int)(voltage * 100) % 10; //百分位
+   uint8_t Single_digit = (int)voltage;
+   uint8_t Decile = (int)(voltage * 10) % 10;
+   uint8_t Percentile = (int)(voltage * 100) % 10;
    display_char(0, Single_digit + '0');
    display_char(5, '.');
    display_char(7, Decile + '0');
@@ -176,7 +176,7 @@ static void show_adc() {
 #define Sunday          {disp_buf[16]|=(1<<5)|(1<<6);}
 #define DisSunday       {disp_buf[16] &= ~((1<<5)|(1<<6));}
 
-static void select_weekday(unsigned char x) //显示星期几
+static void select_weekday(unsigned char x)
 {
    DisSunday;
    DisMonday;
