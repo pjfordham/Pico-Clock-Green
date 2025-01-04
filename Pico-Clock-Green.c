@@ -323,11 +323,8 @@ static void Show_Time()
    Time_RTC.dayofweek = (Time_RTC.dayofweek & 0x07) - 1;
    Time_RTC.dayofmonth = Time_RTC.dayofmonth & 0x3F;
    Time_RTC.month = Time_RTC.month & 0x1F;
+
    unsigned char Set_hour_temp = BCD_to_Byte(Time_RTC.hour);
-   unsigned char min_temp = BCD_to_Byte(Time_RTC.minutes);
-   unsigned char dayofmonth_temp = BCD_to_Byte(Time_RTC.dayofmonth);
-   unsigned char month_temp = BCD_to_Byte(Time_RTC.month);
-   unsigned char year_temp = BCD_to_Byte(Time_RTC.year);
    unsigned char hour_temp;
    if (Set_hour_temp > 12) {
       hour_temp = Set_hour_temp - 12;
