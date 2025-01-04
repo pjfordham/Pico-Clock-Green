@@ -379,12 +379,12 @@ bool repeating_timer_callback_ms(struct repeating_timer *t) { // 1ms进入一次
 bool repeating_timer_callback_s(struct repeating_timer *t) // 1s 进入一次
 {
 
-  Min_count++;
   if (alarm_star_flag == 1) {
     gpio_put(BUZZ, 0);
     alarm_star_flag = 0;
   }
 
+  Min_count++;
   if (Min_count == 60) //每分钟刷新一次时间
   {
     if (alarm_open_sta != 0) {
@@ -648,7 +648,6 @@ static void display_char(unsigned char x, unsigned char dis_char) {
 static void Show_Time() //显示时间
 {
   Time_RTC = Read_RTC(); //获取RTC的值
-  display_char(0, '1');
   Time_RTC.seconds = Time_RTC.seconds & 0x7F;
   Time_RTC.minutes = Time_RTC.minutes & 0x7F;
   Time_RTC.hour = Time_RTC.hour & 0x3F;
@@ -679,8 +678,9 @@ static void Show_Time() //显示时间
     hour_temp = Set_hour_temp;
   }
 
-  Min_count = ((float)Time_RTC.seconds) / 1.5; //计算当前RTC的秒数
+  Min_count = min_temp;//((float)Time_RTC.seconds) / 1.5; //计算当前RTC的秒数
 
+  display_char(0, '1');
   if (scroll_start == 0) {
      display_char(0, ((hour_temp / 10) + '0'));
      display_char(5, ((hour_temp % 10) + '0'));
