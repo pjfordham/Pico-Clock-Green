@@ -243,7 +243,6 @@ static void cls_disp(unsigned char x)
 
 static void send_data(unsigned char data)
 {
- uint32_t x =  save_and_disable_interrupts();
   unsigned char i;
    for (i = 0; i < 8; i++) {
       CLK_LOW;
@@ -256,7 +255,6 @@ static void send_data(unsigned char data)
 
       CLK_HIGH;
    }
-   restore_interrupts(x);
 }
 
 static void display_char(unsigned char x, unsigned char dis_char) {
