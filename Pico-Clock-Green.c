@@ -16,7 +16,6 @@ bool repeating_timer_callback_s(struct repeating_timer *t);
 static void display_char(unsigned char x, unsigned char dis_char);
 static void Show_Time();
 static void send_data(unsigned char data);
-TIME_RTC Time_RTC;
 
 static int port_init(void)
 {
@@ -313,7 +312,7 @@ static void display_char(unsigned char x, unsigned char dis_char) {
 
 static void Show_Time()
 {
-   Time_RTC = Read_RTC();
+   TIME_RTC Time_RTC = Read_RTC();
    Time_RTC.seconds = Time_RTC.seconds & 0x7F;
    Time_RTC.minutes = Time_RTC.minutes & 0x7F;
    Time_RTC.hour = Time_RTC.hour & 0x3F;
