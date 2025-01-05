@@ -64,7 +64,7 @@ static int port_init(void)
    adc_select_input(3);
 }
 
-int show_time = 0;
+int show_time = 1;
 void gpio_callback(uint gpio, uint32_t events) {
    if(gpio==SQW) {
       show_time = 1;
@@ -77,14 +77,13 @@ int main(void) {
 
    init_DS3231();
 
-   gpio_set_irq_enabled_with_callback(SQW, GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
-
-   Set_alarm1_clock( ALARM_MODE_ONCE_PER_SECOND, 0,0,0,0 );
+   gpio_set_irq_enabled_with_callback(SQW, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
 
    struct repeating_timer timer;
-   struct repeating_timer timer1;
 
    add_repeating_timer_ms(1, repeating_timer_callback_ms, NULL, &timer);
+
+   Set_alarm1_clock( ALARM_MODE_SEC_MATCHED, 0,0,0,0 );
 
    absolute_time_t timeout_time = make_timeout_time_ms(50);
    while (1) {
