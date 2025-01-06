@@ -71,22 +71,47 @@ static int port_init(void)
    adc_select_input(3);
 }
 
-int update_time = 1;
-int long_click  = 0;
-int short_click = 0;
+enum clock_events_t {
+  UPDATE_TIME = 0x1,
+  SHORT_CLICK_A = 0x2,
+  LONG_CLICK_A = 0x4,
+  SHORT_CLICK_B = 0x8,
+  LONG_CLICK_B = 0x10,
+  SHORT_CLICK_C = 0x20,
+  LONG_CLICK_C = 0x40,
+} clock_events = UPDATE_TIME;
+
 
 void gpio_callback(uint gpio, uint32_t events) {
    static absolute_time_t SET_FUNCTION_time, UP_time, DOWN_time;
    if(gpio==SQW) {
-      update_time = 1;
+      clock_events |= UPDATE_TIME;
    } else if (gpio == SET_FUNCTION && (events & GPIO_IRQ_EDGE_FALL) ) {
       SET_FUNCTION_time = get_absolute_time();
    } else if (gpio == SET_FUNCTION && (events & GPIO_IRQ_EDGE_RISE) ) {
       int64_t us = absolute_time_diff_us( SET_FUNCTION_time, get_absolute_time());
       if (us > 300000) {
-         long_click = 1;
+         clock_events |= LONG_CLICK_A;
       } else if ( us > 50000 ) {
-         short_click = 1;
+         clock_events |= SHORT_CLICK_A;
+      }
+   } else if (gpio == UP && (events & GPIO_IRQ_EDGE_FALL) ) {
+      UP_time = get_absolute_time();
+   } else if (gpio == UP && (events & GPIO_IRQ_EDGE_RISE) ) {
+      int64_t us = absolute_time_diff_us( UP_time, get_absolute_time());
+      if (us > 300000) {
+         clock_events |= LONG_CLICK_B;
+      } else if ( us > 50000 ) {
+         clock_events |= SHORT_CLICK_B;
+      }
+   } else if (gpio == DOWN && (events & GPIO_IRQ_EDGE_FALL) ) {
+      DOWN_time = get_absolute_time();
+   } else if (gpio == DOWN && (events & GPIO_IRQ_EDGE_RISE) ) {
+      int64_t us = absolute_time_diff_us( DOWN_time, get_absolute_time());
+      if (us > 300000) {
+         clock_events |= LONG_CLICK_C;
+      } else if ( us > 50000 ) {
+         clock_events |= SHORT_CLICK_C;
       }
    } else {
    }
@@ -97,8 +122,10 @@ int main(void) {
 
    init_DS3231();
 
-   gpio_set_irq_enabled_with_callback(SET_FUNCTION, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE , true, &gpio_callback);
-   gpio_set_irq_enabled(SQW, GPIO_IRQ_EDGE_FALL, true);
+   gpio_set_irq_enabled_with_callback(SQW, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
+   gpio_set_irq_enabled(SET_FUNCTION, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE,  true);
+   gpio_set_irq_enabled(UP, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE,  true);
+   gpio_set_irq_enabled(DOWN, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE,  true);
 
    struct repeating_timer timer;
 
@@ -108,20 +135,40 @@ int main(void) {
 
    absolute_time_t timeout_time = make_timeout_time_ms(50);
    while (1) {
-      if (update_time) {
+      if (clock_events & UPDATE_TIME) {
          Update_Time();
          Ds3231_check_alarm();
-         update_time = 0;
+         clock_events &= ~UPDATE_TIME;
       }
-      if (long_click) {
+      if (clock_events & LONG_CLICK_A) {
          display_char(13, '0');
          display_char(18, '0');
-         long_click = 0;
+         clock_events &= ~LONG_CLICK_A;
       }
-      if (short_click) {
+      if (clock_events & SHORT_CLICK_A) {
          display_char(13, '1');
          display_char(18, '1');
-         short_click = 0;
+         clock_events &= ~SHORT_CLICK_A;
+      }
+      if (clock_events & LONG_CLICK_B) {
+         display_char(13, '2');
+         display_char(18, '2');
+         clock_events &= ~LONG_CLICK_B;
+      }
+      if (clock_events & SHORT_CLICK_B) {
+         display_char(13, '3');
+         display_char(18, '3');
+         clock_events &= ~SHORT_CLICK_B;
+      }
+      if (clock_events & LONG_CLICK_C) {
+         display_char(13, '4');
+         display_char(18, '4');
+         clock_events &= ~LONG_CLICK_C;
+      }
+      if (clock_events & SHORT_CLICK_C) {
+         display_char(13, '5');
+         display_char(18, '5');
+         clock_events &= ~SHORT_CLICK_C;
       }
       best_effort_wfe_or_timeout(timeout_time);
    }
@@ -130,46 +177,7 @@ int main(void) {
 
 bool repeating_timer_callback_ms(struct repeating_timer *t) {
 
-   // Button detection and display muxing
-
-   static uint16_t KEY_cnt = 0;
-   if (gpio_get(SET_FUNCTION) == 0) {
-      KEY_cnt++;
-   } else {
-       if (KEY_cnt > 50 && KEY_cnt < 300) {
-          // Short press action
-//             short_click = 1;
-      } else if (KEY_cnt > 300) {
-          //        long_click = 1;
-          // Long press action
-      }
-      KEY_cnt = 0;
-   }
-
-   static uint16_t UP_cnt = 0;
-   if (gpio_get(UP) == 0) {
-      UP_cnt++;
-   } else {
-      if (UP_cnt > 50 && UP_cnt < 300) {
-         // Short press action
-      } else if (UP_cnt > 300 ) {
-         // Long press action
-      }
-      UP_cnt = 0;
-   }
-
-   static uint16_t Exit_cnt = 0;
-   if (gpio_get(DOWN) == 0) {
-      Exit_cnt++;
-   } else {
-      if (Exit_cnt > 50 && Exit_cnt < 300) {
-         // Short press action
-      } else if (Exit_cnt > 300) {
-         // Long press action
-      }
-      Exit_cnt = 0;
-   }
-
+   // Display muxing
    static unsigned char CS_cnt;
    CS_cnt++;
    if (CS_cnt > 7) {
