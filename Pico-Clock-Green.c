@@ -15,7 +15,7 @@ unsigned char disp_buf[112];
 static bool repeating_timer_callback_ms(struct repeating_timer *t);
 
 static void display_char(unsigned char x, unsigned char dis_char);
-static void Show_Time();
+static void Update_Time();
 static void send_data(unsigned char data);
 
 static int port_init(void)
@@ -34,6 +34,13 @@ static int port_init(void)
    gpio_init(SET_FUNCTION);
    gpio_init(UP);
    gpio_init(DOWN);
+
+   gpio_set_dir(SET_FUNCTION, GPIO_IN);
+   gpio_set_dir(UP, GPIO_IN);
+   gpio_set_dir(DOWN, GPIO_IN);
+   gpio_pull_up(SET_FUNCTION);
+   gpio_pull_up(UP);
+   gpio_pull_up(DOWN);
 
    gpio_set_dir(A0, GPIO_OUT);
    gpio_set_dir(A1, GPIO_OUT);
@@ -64,10 +71,23 @@ static int port_init(void)
    adc_select_input(3);
 }
 
-int show_time = 1;
+int update_time = 1;
+int long_click  = 0;
+int short_click = 0;
+
 void gpio_callback(uint gpio, uint32_t events) {
+   static absolute_time_t SET_FUNCTION_time, UP_time, DOWN_time;
    if(gpio==SQW) {
-      show_time = 1;
+      update_time = 1;
+   } else if (gpio == SET_FUNCTION && (events & GPIO_IRQ_EDGE_FALL) ) {
+      SET_FUNCTION_time = get_absolute_time();
+   } else if (gpio == SET_FUNCTION && (events & GPIO_IRQ_EDGE_RISE) ) {
+      int64_t us = absolute_time_diff_us( SET_FUNCTION_time, get_absolute_time());
+      if (us > 300000) {
+         long_click = 1;
+      } else if ( us > 50000 ) {
+         short_click = 1;
+      }
    } else {
    }
 }
@@ -77,7 +97,8 @@ int main(void) {
 
    init_DS3231();
 
-   gpio_set_irq_enabled_with_callback(SQW, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
+   gpio_set_irq_enabled_with_callback(SET_FUNCTION, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE , true, &gpio_callback);
+   gpio_set_irq_enabled(SQW, GPIO_IRQ_EDGE_FALL, true);
 
    struct repeating_timer timer;
 
@@ -87,10 +108,20 @@ int main(void) {
 
    absolute_time_t timeout_time = make_timeout_time_ms(50);
    while (1) {
-      if (show_time) {
-         Show_Time();
+      if (update_time) {
+         Update_Time();
          Ds3231_check_alarm();
-         show_time = 0;
+         update_time = 0;
+      }
+      if (long_click) {
+         display_char(13, '0');
+         display_char(18, '0');
+         long_click = 0;
+      }
+      if (short_click) {
+         display_char(13, '1');
+         display_char(18, '1');
+         short_click = 0;
       }
       best_effort_wfe_or_timeout(timeout_time);
    }
@@ -105,10 +136,12 @@ bool repeating_timer_callback_ms(struct repeating_timer *t) {
    if (gpio_get(SET_FUNCTION) == 0) {
       KEY_cnt++;
    } else {
-      if (KEY_cnt > 50 && KEY_cnt < 300) {
-         // Short press action
+       if (KEY_cnt > 50 && KEY_cnt < 300) {
+          // Short press action
+//             short_click = 1;
       } else if (KEY_cnt > 300) {
-         // Long press action
+          //        long_click = 1;
+          // Long press action
       }
       KEY_cnt = 0;
    }
@@ -328,7 +361,7 @@ static void display_char(unsigned char x, unsigned char dis_char) {
    }
 }
 
-static void Show_Time()
+static void Update_Time()
 {
    TIME_RTC Time_RTC = Read_RTC();
    Time_RTC.seconds = Time_RTC.seconds & 0x7F;
