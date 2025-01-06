@@ -79,6 +79,7 @@ enum clock_events_t {
   LONG_CLICK_B = 0x10,
   SHORT_CLICK_C = 0x20,
   LONG_CLICK_C = 0x40,
+  SHUTDOWN = 0x80
 } clock_events = UPDATE_TIME;
 
 
@@ -134,7 +135,7 @@ int main(void) {
    Set_alarm1_clock( ALARM_MODE_SEC_MATCHED, 0,0,0,0 );
 
    absolute_time_t timeout_time = make_timeout_time_ms(50);
-   while (1) {
+   while (!(clock_events & SHUTDOWN)) {
       if (clock_events & UPDATE_TIME) {
          Update_Time();
          Ds3231_check_alarm();
