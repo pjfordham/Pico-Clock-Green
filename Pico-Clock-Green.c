@@ -186,30 +186,21 @@ int main(void) {
 bool repeating_timer_callback_ms(struct repeating_timer *t) {
 
    // Display muxing
-   static unsigned char CS_cnt;
-   CS_cnt++;
-   if (CS_cnt > 7) {
-      CS_cnt = 0;
-   }
+   static unsigned char CS_cnt = 0;
+
    for (unsigned char i = 0; i < 4; i++) {
       send_data(disp_buf[8 * i + CS_cnt]);
    }
-   LE_HIGH;
-   LE_LOW;
-   if (CS_cnt & 0x01)
-      A0_HIGH;
-   else
-      A0_LOW;
 
-   if (CS_cnt & 0x02)
-      A1_HIGH;
-   else
-      A1_LOW;
+   gpio_put(LE, 1);
+   gpio_put(LE, 0);
 
-   if (CS_cnt & 0x04)
-      A2_HIGH;
-   else
-      A2_LOW;
+   gpio_put(A0, (CS_cnt & 0x1) >> 0);
+   gpio_put(A1, (CS_cnt & 0x2) >> 1);
+   gpio_put(A2, (CS_cnt & 0x4) >> 2);
+
+   CS_cnt++;
+   CS_cnt &= 0x7;
 
    return true;
 }
