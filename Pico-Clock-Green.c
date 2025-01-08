@@ -9,6 +9,7 @@
 #include "hardware/i2c.h"
 #include "hardware/sync.h"
 #include "ziku.h"
+#include "pico/bootrom.h"
 
 unsigned char disp_buf[112];
 
@@ -88,8 +89,10 @@ void gpio_callback(uint gpio, uint32_t events) {
    if(gpio==SQW) {
       clock_events |= UPDATE_TIME;
    } else if (gpio == SET_FUNCTION && (events & GPIO_IRQ_EDGE_FALL) ) {
+      gpio_put(BUZZ,1);
       SET_FUNCTION_time = get_absolute_time();
    } else if (gpio == SET_FUNCTION && (events & GPIO_IRQ_EDGE_RISE) ) {
+      gpio_put(BUZZ,0);
       int64_t us = absolute_time_diff_us( SET_FUNCTION_time, get_absolute_time());
       if (us > 300000) {
          clock_events |= LONG_CLICK_A;
@@ -136,6 +139,9 @@ int main(void) {
 
    absolute_time_t timeout_time = make_timeout_time_ms(50);
    while (!(clock_events & SHUTDOWN)) {
+      // clock_events should always be 0 at the end of this function
+      // so we just copy it ehre and set it to zero with irqs off and
+      // I think we are all good.
       if (clock_events & UPDATE_TIME) {
          Update_Time();
          Ds3231_check_alarm();
@@ -165,6 +171,7 @@ int main(void) {
          display_char(13, '4');
          display_char(18, '4');
          clock_events &= ~LONG_CLICK_C;
+         reset_usb_boot(0,0);
       }
       if (clock_events & SHORT_CLICK_C) {
          display_char(13, '5');
