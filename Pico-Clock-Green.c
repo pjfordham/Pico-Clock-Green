@@ -18,6 +18,7 @@ static bool repeating_timer_callback_ms(struct repeating_timer *t);
 static void display_char(unsigned char x, unsigned char dis_char);
 static void Update_Time();
 static void send_data(unsigned char data);
+static void show_adc();
 
 static int port_init(void)
 {
@@ -64,12 +65,11 @@ static int port_init(void)
 
    // adc config
    adc_init();
+   // change this to habe all ADCs interrupt every 100ms to update
 
    // Make sure GPIO is high-impedance, no pullups etc
    adc_gpio_init(ADC_Light);
    adc_gpio_init(ADC_VCC);
-   // Select ADC input 0 (GPIO26)
-   adc_select_input(3);
 }
 
 enum clock_events_t {
@@ -158,24 +158,22 @@ int main(void) {
          clock_events &= ~SHORT_CLICK_A;
       }
       if (clock_events & LONG_CLICK_B) {
-         display_char(13, '2');
-         display_char(18, '2');
+         adc_select_input(4); // show internal temperature
+         show_adc();
          clock_events &= ~LONG_CLICK_B;
       }
       if (clock_events & SHORT_CLICK_B) {
-         display_char(13, '3');
-         display_char(18, '3');
+         adc_select_input(0); // show light level
+         show_adc();
          clock_events &= ~SHORT_CLICK_B;
       }
       if (clock_events & LONG_CLICK_C) {
-         display_char(13, '4');
-         display_char(18, '4');
+         reset_usb_boot(0,0); // reboot
          clock_events &= ~LONG_CLICK_C;
-         reset_usb_boot(0,0);
       }
       if (clock_events & SHORT_CLICK_C) {
-         display_char(13, '5');
-         display_char(18, '5');
+         adc_select_input(3); // show VSYS voltage
+         show_adc();
          clock_events &= ~SHORT_CLICK_C;
       }
       best_effort_wfe_or_timeout(timeout_time);
