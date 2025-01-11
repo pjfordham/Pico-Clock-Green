@@ -18,7 +18,7 @@ static bool repeating_timer_callback_ms(struct repeating_timer *t);
 static void display_char(unsigned char x, unsigned char dis_char);
 static void Update_Time();
 static void send_data(unsigned char data);
-static void show_adc();
+static void show_adc(int channel);
 
 static int port_init(void)
 {
@@ -65,11 +65,13 @@ static int port_init(void)
 
    // adc config
    adc_init();
-   // change this to habe all ADCs interrupt every 100ms to update
 
-   // Make sure GPIO is high-impedance, no pullups etc
-   adc_gpio_init(ADC_Light);
-   adc_gpio_init(ADC_VCC);
+   // Initialize the GPIOs for ADC (GPIOs 26-30 for ADC0-ADC4)
+   adc_gpio_init(ADC0); // GPIO 26 -> ADC0
+   adc_gpio_init(ADC1); // GPIO 27 -> ADC1
+   adc_gpio_init(ADC2); // GPIO 28 -> ADC2
+   adc_gpio_init(ADC3); // GPIO 29 -> ADC3
+   adc_gpio_init(ADC4); // GPIO 30 -> ADC4
 }
 
 enum clock_events_t {
@@ -80,7 +82,8 @@ enum clock_events_t {
   LONG_CLICK_B = 0x10,
   SHORT_CLICK_C = 0x20,
   LONG_CLICK_C = 0x40,
-  SHUTDOWN = 0x80
+  ADC_UPDATE = 0x80,
+  SHUTDOWN = 0x100
 } clock_events = UPDATE_TIME;
 
 
@@ -121,10 +124,44 @@ void gpio_callback(uint gpio, uint32_t events) {
    }
 }
 
+// Number of ADC channels to monitor
+#define NUM_CHANNELS 5
+
+// Array to hold the latest ADC results for each channel
+volatile uint16_t adc_results[NUM_CHANNELS];
+
+// ADC interrupt handler
+void adc_interrupt_handler() {
+   // Global variable to track the current ADC channel
+   static uint8_t current_channel = 0;
+
+   // Read the ADC value for the current channel
+   adc_results[current_channel] = adc_fifo_get();
+
+   // Switch to the next ADC channel for the next interrupt
+   current_channel = (current_channel + 1) % NUM_CHANNELS;
+
+   // Select the next channel for sampling
+   adc_select_input(current_channel);
+
+   clock_events |= ADC_UPDATE;
+
+   // Clear the interrupt flag for the ADC (handled automatically by the hardware)
+}
+
 int main(void) {
    port_init();
 
+   // Set up ADC to trigger interrupt after a new sample is available
+   adc_select_input(0);  // Start with ADC0 (GPIO 26)
+   adc_fifo_setup(true, true, 1, false, false);  // Set up FIFO to trigger an interrupt after 1 sample
+   // Set up the ADC clock divider to slow down the ADC to 1 sample per second
+   adc_set_clkdiv(12500000.0f);  // This will slow the ADC to about 1 Hz per channel (1250 clock div for 125 kHz default ADC clock)
+
    init_DS3231();
+
+   irq_set_exclusive_handler(ADC_IRQ_FIFO, adc_interrupt_handler);  // Set interrupt handler
+   irq_set_enabled(ADC_IRQ_FIFO, true);  // Enable the ADC interrupt
 
    gpio_set_irq_enabled_with_callback(SQW, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
    gpio_set_irq_enabled(SET_FUNCTION, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE,  true);
@@ -132,10 +169,14 @@ int main(void) {
    gpio_set_irq_enabled(DOWN, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE,  true);
 
    struct repeating_timer timer;
+   int a  = 0;
 
    add_repeating_timer_ms(1, repeating_timer_callback_ms, NULL, &timer);
 
    Set_alarm1_clock( ALARM_MODE_SEC_MATCHED, 0,0,0,0 );
+
+   adc_irq_set_enabled(true);
+   adc_run(true);
 
    absolute_time_t timeout_time = make_timeout_time_ms(50);
    while (!(clock_events & SHUTDOWN)) {
@@ -146,6 +187,12 @@ int main(void) {
          Update_Time();
          Ds3231_check_alarm();
          clock_events &= ~UPDATE_TIME;
+      }
+      if (clock_events & ADC_UPDATE) {
+         if (a) {back_light_on;}
+         else {back_light_off;}
+         a = 1 - a;
+         clock_events &= ~ADC_UPDATE;
       }
       if (clock_events & LONG_CLICK_A) {
          display_char(13, '0');
@@ -158,13 +205,11 @@ int main(void) {
          clock_events &= ~SHORT_CLICK_A;
       }
       if (clock_events & LONG_CLICK_B) {
-         adc_select_input(4); // show internal temperature
-         show_adc();
+         show_adc(ADC_Temp);
          clock_events &= ~LONG_CLICK_B;
       }
       if (clock_events & SHORT_CLICK_B) {
-         adc_select_input(0); // show light level
-         show_adc();
+         show_adc(ADC_Light);
          clock_events &= ~SHORT_CLICK_B;
       }
       if (clock_events & LONG_CLICK_C) {
@@ -172,8 +217,7 @@ int main(void) {
          clock_events &= ~LONG_CLICK_C;
       }
       if (clock_events & SHORT_CLICK_C) {
-         adc_select_input(3); // show VSYS voltage
-         show_adc();
+         show_adc(ADC_VCC);
          clock_events &= ~SHORT_CLICK_C;
       }
       best_effort_wfe_or_timeout(timeout_time);
@@ -203,9 +247,9 @@ bool repeating_timer_callback_ms(struct repeating_timer *t) {
    return true;
 }
 
-static void show_adc() {
+static void show_adc(int channel) {
    const float conversion_factor = 3.3f / (1 << 12);
-   uint16_t result = adc_read();
+   uint16_t result = adc_results[channel];
    float voltage = 3 * result * conversion_factor;
    uint8_t Single_digit = (int)voltage;
    uint8_t Decile = (int)(voltage * 10) % 10;
