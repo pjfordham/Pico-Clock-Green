@@ -12,10 +12,9 @@
 
 //-----define IO------------------------------
 
+// Output enable for shaft registers
 #define	OE	13
-
 #define	OE_OPEN		gpio_put(OE, 0)
-
 #define	OE_CLOSE	gpio_put(OE, 1)
 
 #define	SDI	11
@@ -27,21 +26,9 @@
 #define	CLK_HIGH	gpio_put(CLK, 1)
 
 #define	LE	12
-#define	LE_LOW		gpio_put(LE, 0)
-#define	LE_HIGH		gpio_put(LE, 1)
-
 #define	A0	16
-#define	A0_LOW		gpio_put(A0, 0)
-#define	A0_HIGH		gpio_put(A0, 1)
-
 #define	A1	18
-#define	A1_LOW		gpio_put(A1,0)
-#define	A1_HIGH		gpio_put(A1, 1)
-
 #define	A2	22
-
-#define	A2_LOW		gpio_put(A2, 0)
-#define	A2_HIGH		gpio_put(A2, 1)
 
 
 //定义按键
