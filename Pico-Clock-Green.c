@@ -341,7 +341,7 @@ uint32_t week_mask = 0b000000011011011011011011011000;
 static void select_weekday(unsigned char x)
 {
    display_buffer[0] &= ~week_mask;
-   display_buffer[0] |= day_mask[x%7];
+   display_buffer[0] |= day_mask[x];
 }
 
 static void send_data(uint32_t data)
