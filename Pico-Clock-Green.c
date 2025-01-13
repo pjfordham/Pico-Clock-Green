@@ -420,12 +420,7 @@ static void display_char(unsigned char x, unsigned char dis_char) {
 static void Update_Time()
 {
    TIME_RTC Time_RTC = Read_RTC();
-   Time_RTC.seconds = Time_RTC.seconds & 0x7F;
-   Time_RTC.minutes = Time_RTC.minutes & 0x7F;
-   Time_RTC.hour = Time_RTC.hour & 0x3F;
-   Time_RTC.dayofweek = (Time_RTC.dayofweek & 0x07) - 1;
-   Time_RTC.dayofmonth = Time_RTC.dayofmonth & 0x3F;
-   Time_RTC.month = Time_RTC.month & 0x1F;
+   Time_RTC.dayofweek = Time_RTC.dayofweek - 1;
 
    unsigned char Set_hour_temp = BCD_to_Byte(Time_RTC.hour);
    unsigned char hour_temp;
