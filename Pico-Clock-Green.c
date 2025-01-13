@@ -278,8 +278,7 @@ static void select_weekday(unsigned char x)
 
 static void send_data(uint32_t data)
 {
-  unsigned char i;
-   for (i = 0; i < 32; i++) {
+   for (unsigned char i = 0; i < 32; i++) {
       CLK_LOW;
 
       SDI_LOW;
@@ -382,31 +381,4 @@ static void Update_Time()
    display_char(13, ((Time_RTC.minutes / 16) + '0'));
    display_char(18, ((Time_RTC.minutes % 16) + '0'));
    select_weekday(Time_RTC.dayofweek);
-}
-
-static int is_leap_year(uint16_t year_cnt) {
-   return (year_cnt % 4 == 0 && year_cnt % 100 != 0) || year_cnt % 400 == 0;
-}
-
-static unsigned char get_month_date(uint16_t year_cnt, uint8_t month_cnt)
-{  // Return the number of days in a given month for a given year.
-   static unsigned char month_date[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-
-   if ( month_cnt == 2 && is_leap_year( year_cnt ) ) {
-      return 29;
-   } else {
-      return month_date[month_cnt - 1];
-   }
-}
-
-static unsigned char get_weekday(uint16_t year_cnt, uint8_t month_cnt,
-                                 uint8_t date_cnt)
-{  // Use Zeller's Congrunece formula to calculate the weekday
-   if (month_cnt <= 2) {
-      month_cnt += 12;
-      year_cnt--;
-   }
-   uint8_t weekday = (date_cnt + 2 * month_cnt + 3 * (month_cnt + 1) / 5 + year_cnt +
-                      year_cnt / 4 - year_cnt / 100 + year_cnt / 400) % 7;
-   return weekday == 0 ? 7 : weekday;
 }
