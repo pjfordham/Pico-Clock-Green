@@ -195,13 +195,11 @@ int main(void) {
          clock_events &= ~ADC_UPDATE;
       }
       if (clock_events & LONG_CLICK_A) {
-         display_char(13, '0');
-         display_char(18, '0');
+         dis_Auto_light;
          clock_events &= ~LONG_CLICK_A;
       }
       if (clock_events & SHORT_CLICK_A) {
-         display_char(13, '1');
-         display_char(18, '1');
+         dis_Auto_light_close;
          clock_events &= ~SHORT_CLICK_A;
       }
       if (clock_events & LONG_CLICK_B) {
