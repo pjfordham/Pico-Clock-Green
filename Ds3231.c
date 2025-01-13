@@ -2,6 +2,14 @@
 // Created by yufu on 2021/1/25.
 //
 #include "Ds3231.h"
+#include "hardware/i2c.h"
+
+#include <string.h>
+
+//定义 IIC
+#define Address 0x68
+#define Address_ADS 0x48
+#define I2C_PORT i2c1
 
 uint8_t DS3231_ReadReg[17];
 bool hourMode;
@@ -45,6 +53,7 @@ void ByteData()
 void init_DS3231()
 {
     uint8_t val[2];
+    i2c_init(I2C_PORT, 100000);
     val[0] = DS3231_REG_CONTROL;
     val[1] = Control_default;
     i2c_write_blocking(I2C_PORT,Address,val,2,false);

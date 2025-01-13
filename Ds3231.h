@@ -4,10 +4,19 @@
 
 #ifndef PICO_EXAMPLES_DS3231_H
 #define PICO_EXAMPLES_DS3231_H
-#include <stdio.h>
-#include "hardware/i2c.h"
-#include "define.h"
-#include "string.h"
+
+#include <stdint.h>
+#include <stdbool.h>
+
+typedef struct {
+    uint8_t seconds;
+    uint8_t minutes;
+    uint8_t hour;
+    uint8_t dayofweek;
+    uint8_t dayofmonth;
+    uint8_t month;
+    uint8_t year;
+} TIME_RTC;
 
 #define DS3231_REG_SECOND 	0x00
 #define DS3231_REG_MINUTE 	0x01
@@ -33,13 +42,18 @@
 //启动定时器，关闭电池供电方波使能，强制启动温度转换，SQW引脚输出1Hz方波，关闭闹钟中断使能
 #define	Status_default		0x00	//关闭32.768K方波输出，清除闹钟标志位
 
+typedef enum
+{
+    ALARM_MODE_ALL_MATCHED = 0,
+    ALARM_MODE_HOUR_MIN_SEC_MATCHED,
+    ALARM_MODE_MIN_SEC_MATCHED,
+    ALARM_MODE_SEC_MATCHED,
+    ALARM_MODE_ONCE_PER_SECOND
+} AlarmMode;
+
+
 TIME_RTC Read_RTC();
 
-extern bool hourMode;
-extern char meridiem[2][3];
-extern uint8_t byteData[16];
-extern char stateOfTime[3];
-extern uint8_t DS3231_ReadReg[17];
 void init_DS3231();
 void Set_Time(uint8_t sec,uint8_t min,uint8_t hour, uint8_t dow,uint8_t dom,uint8_t month,uint8_t year);
 void Set_alarm1_clock(uint8_t mode,uint8_t sec,uint8_t min,uint8_t hour,uint8_t data);
