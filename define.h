@@ -83,28 +83,28 @@ typedef enum
 
 
 //----------------状态LED指示灯定义-------------------------
-#define dis_move_open           disp_buf[0]|= 0X03
-#define dis_move_close          disp_buf[0] &= ~0X03
-#define dis_Alarm_en            disp_buf[1]|= 0X03
-#define dis_Alarm_close         disp_buf[1] &= ~0x03
-#define dis_CountDown           disp_buf[2]|= 0X03
-#define dis_CountDown_close     disp_buf[2] &= ~0x03
-#define dis_F_flag              disp_buf[3]|= (1<<0)
-#define dis_F_flag_close        disp_buf[3] &= ~(1<<0)
-#define dis_C_flag              disp_buf[3]|= (1<<1)
-#define dis_C_flag_close        disp_buf[3] &= ~(1<<1)
-#define dis_AM                  disp_buf[4]|=(1<<0)
-#define dis_AM_close            disp_buf[4] &= ~(1<<0)
-#define dis_PM                  disp_buf[4]|= (1<<1)
-#define dis_PM_close            disp_buf[4] &= ~(1<<1)
-#define dis_CountUp             disp_buf[5]|=0X03
-#define dis_CountUp_close       disp_buf[5] &= ~0x03
-#define dis_hourly_chime        disp_buf[6]|= 0X03
-#define dis_hourly_chime_close  disp_buf[6] &= ~0X03
-#define dis_Auto_light          disp_buf[7]|= 0X03
-#define dis_Auto_light_close    disp_buf[7] &= ~0X03
-#define back_light_on           disp_buf[0]|=(1<<2)|(1<<5)
-#define back_light_off          disp_buf[0]&=~((1<<2)|(1<<5))
+#define dis_move_open           display_buffer[0]|= 0X03
+#define dis_move_close          display_buffer[0] &= ~0X03
+#define dis_Alarm_en            display_buffer[1]|= 0X03
+#define dis_Alarm_close         display_buffer[1] &= ~0x03
+#define dis_CountDown           display_buffer[2]|= 0X03
+#define dis_CountDown_close     display_buffer[2] &= ~0x03
+#define dis_F_flag              display_buffer[3]|= (1<<0)
+#define dis_F_flag_close        display_buffer[3] &= ~(1<<0)
+#define dis_C_flag              display_buffer[3]|= (1<<1)
+#define dis_C_flag_close        display_buffer[3] &= ~(1<<1)
+#define dis_AM                  display_buffer[4]|=(1<<0)
+#define dis_AM_close            display_buffer[4] &= ~(1<<0)
+#define dis_PM                  display_buffer[4]|= (1<<1)
+#define dis_PM_close            display_buffer[4] &= ~(1<<1)
+#define dis_CountUp             display_buffer[5]|=0X03
+#define dis_CountUp_close       display_buffer[5] &= ~0x03
+#define dis_hourly_chime        display_buffer[6]|= 0X03
+#define dis_hourly_chime_close  display_buffer[6] &= ~0X03
+#define dis_Auto_light          display_buffer[7]|= 0X03
+#define dis_Auto_light_close    display_buffer[7] &= ~0X03
+#define back_light_on           display_buffer[0]|=(1<<2)|(1<<5)
+#define back_light_off          display_buffer[0]&=~((1<<2)|(1<<5))
 
 
 #endif

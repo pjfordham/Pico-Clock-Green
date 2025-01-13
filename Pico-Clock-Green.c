@@ -11,13 +11,13 @@
 #include "ziku.h"
 #include "pico/bootrom.h"
 
-unsigned char disp_buf[112];
+static uint32_t display_buffer[8];
 
 static bool repeating_timer_callback_ms(struct repeating_timer *t);
 
 static void display_char(unsigned char x, unsigned char dis_char);
 static void Update_Time();
-static void send_data(unsigned char data);
+static void send_data(uint32_t data);
 static void show_adc(int channel);
 
 static int port_init(void)
@@ -230,9 +230,7 @@ bool repeating_timer_callback_ms(struct repeating_timer *t) {
    // Display muxing
    static unsigned char CS_cnt = 0;
 
-   for (unsigned char i = 0; i < 4; i++) {
-      send_data(disp_buf[8 * i + CS_cnt]);
-   }
+   send_data(display_buffer[CS_cnt]);
 
    gpio_put(LE, 1);
    gpio_put(LE, 0);
@@ -261,71 +259,27 @@ static void show_adc(int channel) {
    display_char(17, 'U');
 }
 
-#define Monday          {disp_buf[0]|=(1<<3)|(1<<4);}
-#define DisMonday       {disp_buf[0] &= ~((1<<3)|(1<<4));}
-#define Tuesday         {disp_buf[0]|=(1<<6)|(1<<7);}
-#define DisTuesday      {disp_buf[0] &= ~((1<<6)|(1<<7));}
-#define Wednesday       {disp_buf[8]|=(1<<1)|(1<<2);}
-#define DisWednesday    {disp_buf[8] &= ~((1<<1)|(1<<2));}
-#define Thursday        {disp_buf[8]|=(1<<4)|(1<<5);}
-#define DisThursday     {disp_buf[8] &= ~((1<<4)|(1<<5));}
-#define Friday          {disp_buf[8]|=(1<<7);disp_buf[16]|=(1<<0);}
-#define DisFriday       {disp_buf[8] &= ~(1<<7);disp_buf[16] &= ~(1<<0);}
-#define Saturday        {disp_buf[16]|=(1<<2)|(1<<3);}
-#define DisSaturday     {disp_buf[16]&= ~((1<<2)|(1<<3));}
-#define Sunday          {disp_buf[16]|=(1<<5)|(1<<6);}
-#define DisSunday       {disp_buf[16] &= ~((1<<5)|(1<<6));}
+uint32_t day_mask[7] = {
+   0b000000000000000000000000011000,   // Monday
+   0b000000000000000000000011000000,   // Tuesday
+   0b000000000000000000011000000000,
+   0b000000000000000011000000000000,
+   0b000000000000011000000000000000,
+   0b000000000011000000000000000000,
+   0b000000011000000000000000000000 }; // Sunday
+
+uint32_t week_mask = 0b000000011011011011011011011000;
 
 static void select_weekday(unsigned char x)
 {
-   DisSunday;
-   DisMonday;
-   DisTuesday;
-   DisWednesday;
-   DisThursday;
-   DisFriday;
-   DisSaturday;
-
-   switch (x) {
-   case 0:
-      Monday;
-      break;
-   case 1:
-      Tuesday;
-      break;
-   case 2:
-      Wednesday;
-      break;
-   case 3:
-      Thursday;
-      break;
-   case 4:
-      Friday;
-      break;
-   case 5:
-      Saturday;
-      break;
-   case 6:
-      Sunday;
-      break;
-   default:
-      // Should leave day blank
-      break;
-   }
+   display_buffer[0] &= ~week_mask;
+   display_buffer[0] |= day_mask[x%7];
 }
 
-static void cls_disp(unsigned char x)
-{
-   do {
-      display_char(x, ' ');
-      x += 8;
-   } while (x < sizeof(disp_buf));
-}
-
-static void send_data(unsigned char data)
+static void send_data(uint32_t data)
 {
   unsigned char i;
-   for (i = 0; i < 8; i++) {
+   for (i = 0; i < 32; i++) {
       CLK_LOW;
 
       SDI_LOW;
@@ -339,10 +293,7 @@ static void send_data(unsigned char data)
 }
 
 static void display_char(unsigned char x, unsigned char dis_char) {
-   unsigned char i, j, k;
    x += disp_offset;
-   j = x / 8;
-   k = x % 8;
    if ((dis_char >= '0') && (dis_char <= '9'))
       dis_char -= 0x30;
    else if ((dis_char >= 'A') && (dis_char <= 'F'))
@@ -392,21 +343,10 @@ static void display_char(unsigned char x, unsigned char dis_char) {
          // case 'V':dis_char=28;break;
          // case 'W':dis_char=29;break;
       }
-   for (i = 1; i < 8; i++) {
-      if (k > 0) {
-
-         disp_buf[8 * j + i] =
-            (disp_buf[8 * j + i] & (0xff >> (8 - k))) |
-            ((ZIKU[dis_char * 7 + i - 1]) << k);
-         if (j < (sizeof(disp_buf) / 8) - 1) {
-            disp_buf[8 * j + 8 + i] =
-               (disp_buf[8 * j + 8 + i] & (0xff << (8 - k))) |
-               ((ZIKU[dis_char * 7 + i - 1]) >> (8 - k));
-         }
-
-      } else {
-         disp_buf[8 * j + i] = (ZIKU[dis_char * 7 + i - 1]);
-      }
+   for (unsigned int i = 1; i < 8; i++) {
+      uint32_t z = ZIKU[dis_char * 7 + i - 1] & 0x1F;
+      display_buffer[i] &= ~(0x1f << x);
+      display_buffer[i] |=  (z    << x);
    }
 }
 
