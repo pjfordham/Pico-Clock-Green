@@ -60,31 +60,46 @@
 //------------定义左侧状态指示灯使用的个数---------
 #define	disp_offset		2
 
-//----------------状态LED指示灯定义-------------------------
-#define dis_move_open           display_buffer[0]|= 0X03
-#define dis_move_close          display_buffer[0] &= ~0X03
-#define dis_Alarm_en            display_buffer[1]|= 0X03
-#define dis_Alarm_close         display_buffer[1] &= ~0x03
-#define dis_CountDown           display_buffer[2]|= 0X03
-#define dis_CountDown_close     display_buffer[2] &= ~0x03
-#define dis_F_flag              display_buffer[3]|= (1<<0)
-#define dis_F_flag_close        display_buffer[3] &= ~(1<<0)
-#define dis_C_flag              display_buffer[3]|= (1<<1)
-#define dis_C_flag_close        display_buffer[3] &= ~(1<<1)
-#define dis_AM                  display_buffer[4]|=(1<<0)
-#define dis_AM_close            display_buffer[4] &= ~(1<<0)
-#define dis_PM                  display_buffer[4]|= (1<<1)
-#define dis_PM_close            display_buffer[4] &= ~(1<<1)
-#define dis_CountUp             display_buffer[5]|=0X03
-#define dis_CountUp_close       display_buffer[5] &= ~0x03
-#define dis_hourly_chime        display_buffer[6]|= 0X03
-#define dis_hourly_chime_close  display_buffer[6] &= ~0X03
-#define dis_Auto_light          display_buffer[7]|= 0X03
-#define dis_Auto_light_close    display_buffer[7] &= ~0X03
-#define back_light_on           display_buffer[0]|=(1<<2)|(1<<5)
-#define back_light_off          display_buffer[0]&=~((1<<2)|(1<<5))
+enum {
+  MOVE_ON = 0,
+  ALARM_ON,
+  COUNT_DOWN,
+  F,
+  C,
+  AM,
+  PM,
+  COUNT_UP,
+  HOURLY,
+  AUTO_LIGHT,
+  BACK_LIGHT
+};
+
+struct {
+   uint8_t bits;
+   uint8_t line;
+} indicator[] = {
+   {0x3, 0},
+   {0x3, 1},
+   {0x3, 2},
+   {0x1, 3},
+   {0x2, 3},
+   {0x1, 4},
+   {0x2, 4},
+   {0x3, 5},
+   {0x3, 6},
+   {0x3, 7},
+   {0x24, 0}
+};
 
 static uint32_t display_buffer[8];
+
+static void display(uint8_t x) {
+   display_buffer[indicator[x].line]|=indicator[x].bits;
+}
+
+static void clear(uint8_t x) {
+   display_buffer[indicator[x].line]&=~indicator[x].bits;
+}
 
 static bool repeating_timer_callback_ms(struct repeating_timer *t);
 
@@ -259,17 +274,20 @@ int main(void) {
          clock_events &= ~UPDATE_TIME;
       }
       if (clock_events & ADC_UPDATE) {
-         if (a) {back_light_on;}
-         else {back_light_off;}
+         if (a) {
+            display(BACK_LIGHT);
+         } else {
+            clear(BACK_LIGHT);
+         }
          a = 1 - a;
          clock_events &= ~ADC_UPDATE;
       }
       if (clock_events & LONG_CLICK_A) {
-         dis_Auto_light;
+         display(AUTO_LIGHT);
          clock_events &= ~LONG_CLICK_A;
       }
       if (clock_events & SHORT_CLICK_A) {
-         dis_Auto_light_close;
+         clear(AUTO_LIGHT);
          clock_events &= ~SHORT_CLICK_A;
       }
       if (clock_events & LONG_CLICK_B) {
@@ -338,7 +356,7 @@ uint32_t day_mask[7] = {
 
 uint32_t week_mask = 0b000000011011011011011011011000;
 
-static void select_weekday(unsigned char x)
+static void display_weekday(unsigned char x)
 {
    display_buffer[0] &= ~week_mask;
    display_buffer[0] |= day_mask[x];
@@ -426,16 +444,16 @@ static void Update_Time()
    unsigned char hour_temp;
    if (Set_hour_temp > 12) {
       hour_temp = Set_hour_temp - 12;
-      dis_PM;
-      dis_AM_close;
+      display(PM);
+      clear(AM);
    } else if (Set_hour_temp == 12) {
       hour_temp = 12;
-      dis_PM;
-      dis_AM_close;
+      display(PM);
+      clear(AM);
    } else {
       hour_temp = Set_hour_temp;
-      dis_AM;
-      dis_PM_close;
+      display(AM);
+      clear(PM);
    }
 
    display_char(0, ((hour_temp / 10) + '0'));
@@ -443,5 +461,5 @@ static void Update_Time()
    display_char(10, ':');
    display_char(13, ((Time_RTC.minutes / 16) + '0'));
    display_char(18, ((Time_RTC.minutes % 16) + '0'));
-   select_weekday(Time_RTC.dayofweek);
+   display_weekday(Time_RTC.dayofweek);
 }
