@@ -120,7 +120,7 @@ void set_pwm_frequency_and_duty(uint pin, uint wrap_value, uint duty_cycle_perce
     pwm_set_wrap(slice_num, wrap_value);
 
     // Calculate the duty cycle level
-    uint duty_cycle = (wrap_value / 2);
+    uint duty_cycle = (wrap_value * duty_cycle_percent) / 100;
     pwm_set_gpio_level(pin, duty_cycle);  // Set the duty cycle
 
     // Enable PWM
@@ -184,6 +184,19 @@ static int port_init(void)
    adc_gpio_init(ADC2); // GPIO 28 -> ADC2
    adc_gpio_init(ADC3); // GPIO 29 -> ADC3
    adc_gpio_init(ADC4); // GPIO 30 -> ADC4
+
+   // Set display brightness
+   gpio_set_function(OE, GPIO_FUNC_PWM);
+   float clkdiv = 1.0f;
+   uint slice_num = pwm_gpio_to_slice_num(OE);
+   pwm_set_clkdiv(slice_num, clkdiv);
+   pwm_set_enabled(slice_num, false); // Stop the PWM
+   pwm_set_wrap(slice_num, 256);
+   pwm_set_gpio_level(OE, 200); // 255 - 0 => Off - On
+   pwm_set_enabled(slice_num, true);
+
+   // gpio_set_function(BUZZ, GPIO_FUNC_PWM);
+   // gpio_set_function(BUZZ, GPIO_FUNC_PWM);
 
    // gpio_set_function(BUZZ, GPIO_FUNC_PWM);
    // gpio_put(BUZZ,1);
