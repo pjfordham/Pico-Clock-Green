@@ -13,7 +13,7 @@ add_executable(${PROJECT_NAME}
         Ds3231.c Ds3231.h)
 
 # Pull in our pico_stdlib which pulls in commonly used features
-target_link_libraries(${PROJECT_NAME} pico_stdlib hardware_i2c hardware_adc)
+target_link_libraries(${PROJECT_NAME} pico_stdlib hardware_i2c hardware_adc hardware_pwm)
 
 # enable usb or uart output
 pico_enable_stdio_usb(${PROJECT_NAME} 1)

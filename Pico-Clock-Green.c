@@ -8,6 +8,7 @@
 #include "ziku.h"
 
 #include "hardware/adc.h"
+#include "hardware/pwm.h"
 #include "pico/bootrom.h"
 #include "pico/stdlib.h"
 
@@ -108,6 +109,32 @@ static void Update_Time();
 static void send_data(uint32_t data);
 static void show_adc(int channel);
 
+// Function to set PWM for a given frequency and duty cycle
+void set_pwm_frequency_and_duty(uint pin, uint wrap_value, uint duty_cycle_percent) {
+    uint slice_num = pwm_gpio_to_slice_num(pin);
+    pwm_set_enabled(slice_num, false); // Stop the PWM
+
+    // Set the PWM clock divider and wrap value
+//    uint16_t wrap_value = 100000.0 / frequency;
+
+    pwm_set_wrap(slice_num, wrap_value);
+
+    // Calculate the duty cycle level
+    uint duty_cycle = (wrap_value / 2);
+    pwm_set_gpio_level(pin, duty_cycle);  // Set the duty cycle
+
+    // Enable PWM
+    pwm_set_enabled(slice_num, true);
+}
+
+void beep(uint16_t period, uint16_t duration) {
+   set_pwm_frequency_and_duty(BUZZ, period, 50);
+   sleep_ms(duration);
+   pwm_set_enabled(pwm_gpio_to_slice_num(BUZZ), false); // Stop the PWM
+   gpio_put(BUZZ,1);
+   sleep_ms(100);
+}
+
 static int port_init(void)
 {
    stdio_init_all();
@@ -157,6 +184,18 @@ static int port_init(void)
    adc_gpio_init(ADC2); // GPIO 28 -> ADC2
    adc_gpio_init(ADC3); // GPIO 29 -> ADC3
    adc_gpio_init(ADC4); // GPIO 30 -> ADC4
+
+   // gpio_set_function(BUZZ, GPIO_FUNC_PWM);
+   // gpio_put(BUZZ,1);
+   //  float clkdiv = 1.0f;
+   //  pwm_set_clkdiv(pwm_gpio_to_slice_num(BUZZ), clkdiv);
+   //  sleep_ms(1000);
+
+   //  beep(59653, 1000);    // Set PWM for C7
+   //  beep(52451, 1000);    // Set PWM for D7
+   //  beep(46239, 1000);    // Set PWM for E7
+
+   //  reset_usb_boot(0,0); // reboot
 }
 
 enum clock_events_t {
