@@ -45,9 +45,9 @@ typedef struct NTP_T_ {
 static void ntp_result(NTP_T* state, int status, time_t *result) {
     if (status == 0 && result) {
         struct tm *utc = gmtime(result);
-        printf("got ntp response: %02d/%02d/%04d %02d:%02d:%02d %d\n", utc->tm_mday, utc->tm_mon + 1, utc->tm_year + 1900,
-               utc->tm_hour, utc->tm_min, utc->tm_sec, (utc->tm_wday +6 ) %7);
-        Set_Time( utc->tm_sec, utc->tm_min, utc->tm_hour, (utc->tm_wday + 6) % 7, utc->tm_mday, utc->tm_mon, utc->tm_year);
+        printf("got ntp response: %02d/%02d/%04d %02d:%02d:%02d\n", utc->tm_mday, utc->tm_mon + 1, utc->tm_year + 1900,
+               utc->tm_hour, utc->tm_min, utc->tm_sec);
+        Set_Time( utc->tm_sec, utc->tm_min, utc->tm_hour, utc->tm_wday + 1, utc->tm_mday, utc->tm_mon, utc->tm_year);
     }
 
     if (state->ntp_resend_alarm > 0) {
@@ -564,13 +564,16 @@ static void show_adc(int channel) {
 }
 
 uint32_t day_mask[7] = {
+   0b000000011000000000000000000000,   // Sunday
    0b000000000000000000000000011000,   // Monday
    0b000000000000000000000011000000,   // Tuesday
    0b000000000000000000011000000000,
    0b000000000000000011000000000000,
    0b000000000000011000000000000000,
-   0b000000000011000000000000000000,
-   0b000000011000000000000000000000 }; // Sunday
+   0b000000000011000000000000000000
+};
+
+
 
 uint32_t week_mask = 0b000000011011011011011011011000;
 
@@ -658,8 +661,19 @@ static void Update_Time()
    TIME_RTC Time_RTC = Read_RTC();
    Time_RTC.dayofweek = Time_RTC.dayofweek - 1;
 
-   unsigned char Set_hour_temp = (BCD_to_Byte(Time_RTC.hour) + UTC_OFFSET + 24) % 24;
-   unsigned char hour_temp;
+   int Set_hour_temp = BCD_to_Byte(Time_RTC.hour) + UTC_OFFSET;
+   int day;
+
+   if (Set_hour_temp < 0) {
+      Set_hour_temp += 24;
+      day = ( Time_RTC.dayofweek + 6 ) % 7;
+   } else if (Set_hour_temp > 23 ) {
+      Set_hour_temp -= 24;
+      day = ( Time_RTC.dayofweek + 1 ) % 7;
+   } else {
+      day = Time_RTC.dayofweek;
+   }
+   char hour_temp;
    if (Set_hour_temp > 12) {
       hour_temp = Set_hour_temp - 12;
       display(PM);
@@ -679,5 +693,5 @@ static void Update_Time()
    display_char(10, ':');
    display_char(13, ((Time_RTC.minutes / 16) + '0'));
    display_char(18, ((Time_RTC.minutes % 16) + '0'));
-   display_weekday(Time_RTC.dayofweek);
+   display_weekday(day);
 }
