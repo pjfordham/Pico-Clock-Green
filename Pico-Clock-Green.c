@@ -23,6 +23,8 @@
 #include "lwip/pbuf.h"
 #include "lwip/udp.h"
 
+#define UTC_OFFSET (-8)
+
 typedef struct NTP_T_ {
     ip_addr_t ntp_server_address;
     bool dns_request_sent;
@@ -38,12 +40,14 @@ typedef struct NTP_T_ {
 #define NTP_TEST_TIME (300 * 1000) // Get time over NTP every five minutes
 #define NTP_RESEND_TIME (10 * 1000)
 
+
 // Called with results of operation
 static void ntp_result(NTP_T* state, int status, time_t *result) {
     if (status == 0 && result) {
         struct tm *utc = gmtime(result);
-        printf("got ntp response: %02d/%02d/%04d %02d:%02d:%02d\n", utc->tm_mday, utc->tm_mon + 1, utc->tm_year + 1900,
-               utc->tm_hour, utc->tm_min, utc->tm_sec);
+        printf("got ntp response: %02d/%02d/%04d %02d:%02d:%02d %d\n", utc->tm_mday, utc->tm_mon + 1, utc->tm_year + 1900,
+               utc->tm_hour, utc->tm_min, utc->tm_sec, (utc->tm_wday +6 ) %7);
+        Set_Time( utc->tm_sec, utc->tm_min, utc->tm_hour, (utc->tm_wday + 6) % 7, utc->tm_mday, utc->tm_mon, utc->tm_year);
     }
 
     if (state->ntp_resend_alarm > 0) {
@@ -654,7 +658,7 @@ static void Update_Time()
    TIME_RTC Time_RTC = Read_RTC();
    Time_RTC.dayofweek = Time_RTC.dayofweek - 1;
 
-   unsigned char Set_hour_temp = BCD_to_Byte(Time_RTC.hour);
+   unsigned char Set_hour_temp = (BCD_to_Byte(Time_RTC.hour) + UTC_OFFSET + 24) % 24;
    unsigned char hour_temp;
    if (Set_hour_temp > 12) {
       hour_temp = Set_hour_temp - 12;
