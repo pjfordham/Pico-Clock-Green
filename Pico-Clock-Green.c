@@ -9,6 +9,7 @@
 
 #include "hardware/adc.h"
 #include "hardware/pwm.h"
+#include "hardware/sync.h"
 #include "pico/bootrom.h"
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
@@ -456,47 +457,46 @@ int main(void) {
    adc_run(true);
 
    absolute_time_t timeout_time = make_timeout_time_ms(50);
-   while (!(clock_events & SHUTDOWN)) {
-      // clock_events should always be 0 at the end of this function
-      // so we just copy it ehre and set it to zero with irqs off and
-      // I think we are all good.
-      if (clock_events & UPDATE_TIME) {
+   while (true) {
+
+      // We want to avoid racing RMW from irq handlers here so we disable them
+      uint32_t i = save_and_disable_interrupts();
+      clock_events_t c = clock_events;
+      clock_events = 0;
+      restore_interrupts(i);
+
+      if (c & UPDATE_TIME) {
          Update_Time();
          Ds3231_check_alarm();
-         clock_events &= ~UPDATE_TIME;
       }
-      if (clock_events & ADC_UPDATE) {
+      if (c & ADC_UPDATE) {
          if (a) {
             display(BACK_LIGHT);
          } else {
             clear(BACK_LIGHT);
          }
          a = 1 - a;
-         clock_events &= ~ADC_UPDATE;
       }
-      if (clock_events & LONG_CLICK_A) {
+      if (c & LONG_CLICK_A) {
          display(AUTO_LIGHT);
-         clock_events &= ~LONG_CLICK_A;
       }
-      if (clock_events & SHORT_CLICK_A) {
+      if (c & SHORT_CLICK_A) {
          clear(AUTO_LIGHT);
-         clock_events &= ~SHORT_CLICK_A;
       }
-      if (clock_events & LONG_CLICK_B) {
+      if (c & LONG_CLICK_B) {
          show_adc(ADC_Temp);
-         clock_events &= ~LONG_CLICK_B;
       }
-      if (clock_events & SHORT_CLICK_B) {
+      if (c & SHORT_CLICK_B) {
          show_adc(ADC_Light);
-         clock_events &= ~SHORT_CLICK_B;
       }
-      if (clock_events & LONG_CLICK_C) {
+      if (c & LONG_CLICK_C) {
          reset_usb_boot(0,0); // reboot
-         clock_events &= ~LONG_CLICK_C;
       }
-      if (clock_events & SHORT_CLICK_C) {
+      if (c & SHORT_CLICK_C) {
          show_adc(ADC_VCC);
-         clock_events &= ~SHORT_CLICK_C;
+      }
+      if (c & SHUTDOWN) {
+         break;
       }
 
       if (state) {
