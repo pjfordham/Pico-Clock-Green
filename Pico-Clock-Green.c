@@ -232,7 +232,7 @@ static void clear(uint8_t x) {
 static bool repeating_timer_callback_ms(struct repeating_timer *t);
 
 static void display_char(unsigned char x, unsigned char dis_char);
-static void Update_Time();
+static void display_time();
 static void send_data(uint32_t data);
 static void show_adc(int channel);
 
@@ -526,7 +526,7 @@ int main(void) {
          Set_Time( utc->tm_sec, utc->tm_min, utc->tm_hour, utc->tm_wday + 1, utc->tm_mday, utc->tm_mon, utc->tm_year);
       }
       if (c & UPDATE_TIME) {
-         Update_Time();
+         display_time();
          Ds3231_check_alarm();
       }
       if (c & ADC_UPDATE) {
@@ -690,7 +690,7 @@ static void display_char(unsigned char x, unsigned char dis_char) {
    }
 }
 
-static void Update_Time()
+static void display_time()
 {
    TIME_RTC Time_RTC = Read_RTC();
    Time_RTC.dayofweek = Time_RTC.dayofweek - 1;
