@@ -12,6 +12,7 @@
 #include "hardware/sync.h"
 #include "pico/bootrom.h"
 #include "pico/stdlib.h"
+#include "pico/multicore.h"
 #include "pico/cyw43_arch.h"
 
 #include <string.h>
@@ -41,14 +42,14 @@ typedef struct NTP_T_ {
 #define NTP_TEST_TIME (300 * 1000) // Get time over NTP every five minutes
 #define NTP_RESEND_TIME (10 * 1000)
 
-
+struct tm *utc;
 // Called with results of operation
 static void ntp_result(NTP_T* state, int status, time_t *result) {
     if (status == 0 && result) {
-        struct tm *utc = gmtime(result);
+        utc = gmtime(result);
         printf("got ntp response: %02d/%02d/%04d %02d:%02d:%02d\n", utc->tm_mday, utc->tm_mon + 1, utc->tm_year + 1900,
                utc->tm_hour, utc->tm_min, utc->tm_sec);
-        Set_Time( utc->tm_sec, utc->tm_min, utc->tm_hour, utc->tm_wday + 1, utc->tm_mday, utc->tm_mon, utc->tm_year);
+        multicore_fifo_push_blocking(1);
     }
 
     if (state->ntp_resend_alarm > 0) {
@@ -346,7 +347,8 @@ enum clock_events_t {
   SHORT_CLICK_C = 0x20,
   LONG_CLICK_C = 0x40,
   ADC_UPDATE = 0x80,
-  SHUTDOWN = 0x100
+  NTP_UPDATE = 0x100,
+  SHUTDOWN = 0x200
 } clock_events = UPDATE_TIME;
 
 
@@ -413,22 +415,76 @@ void adc_interrupt_handler() {
 }
 
 
-int main(void) {
-   port_init();
-
+void core1_entry() {
    if (cyw43_arch_init()) {
-      printf("failed to initialise\n");
-      return 1;
+      printf("failed to initialise WiFi\n");
+      return;
    }
 
    cyw43_arch_enable_sta_mode();
 
    if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 10000)) {
-      printf("failed to connect\n");
-      return 1;
+      printf("failed to connect to WiFi\n");
+      return;
    }
 
+
+   // Send something to Core0, this should fire the interrupt.
+   // multicore_fifo_push_blocking(FLAG_VALUE1);
+
    NTP_T *state = ntp_init();
+
+   absolute_time_t timeout_time = make_timeout_time_ms(50);
+   while(true) {
+      if (state) {
+         if (absolute_time_diff_us(get_absolute_time(), state->ntp_test_time) < 0 && !state->dns_request_sent) {
+            // Set alarm in case udp requests are lost
+            state->ntp_resend_alarm = add_alarm_in_ms(NTP_RESEND_TIME, ntp_failed_handler, state, true);
+
+            // cyw43_arch_lwip_begin/end should be used around calls into lwIP to ensure correct locking.
+            // You can omit them if you are in a callback from lwIP. Note that when using pico_cyw_arch_poll
+            // these calls are a no-op and can be omitted, but it is a good practice to use them in
+            // case you switch the cyw43_arch type later.
+            cyw43_arch_lwip_begin();
+            int err = dns_gethostbyname(NTP_SERVER, &state->ntp_server_address, ntp_dns_found, state);
+            cyw43_arch_lwip_end();
+
+            state->dns_request_sent = true;
+            if (err == ERR_OK) {
+               ntp_request(state); // Cached result
+            } else if (err != ERR_INPROGRESS) { // ERR_INPROGRESS means expect a callback
+               printf("dns request failed\n");
+               ntp_result(state, -1, NULL);
+            }
+         }
+      }
+
+      best_effort_wfe_or_timeout(timeout_time);
+   }
+   cyw43_arch_deinit();
+   free(state);
+}
+
+void core0_sio_irq() {
+    // Just record the latest entry
+   int core0_rx_val;
+   while (multicore_fifo_rvalid())
+      core0_rx_val = multicore_fifo_pop_blocking();
+
+   clock_events |= NTP_UPDATE;
+
+   multicore_fifo_clear_irq();
+}
+
+int main(void) {
+   port_init();
+
+
+   multicore_fifo_clear_irq();
+   multicore_launch_core1(core1_entry);
+
+   irq_set_exclusive_handler(SIO_FIFO_IRQ_NUM(0), core0_sio_irq);
+   irq_set_enabled(SIO_FIFO_IRQ_NUM(0), true);
 
    // Set up ADC to trigger interrupt after a new sample is available
    adc_select_input(0);  // Start with ADC0 (GPIO 26)
@@ -461,10 +517,14 @@ int main(void) {
 
       // We want to avoid racing RMW from irq handlers here so we disable them
       uint32_t i = save_and_disable_interrupts();
-      clock_events_t c = clock_events;
+      enum clock_events_t c = clock_events;
       clock_events = 0;
       restore_interrupts(i);
 
+      if (c & NTP_UPDATE) {
+         // Reading UTC without locking is techincally a race but it's probably fine.
+         Set_Time( utc->tm_sec, utc->tm_min, utc->tm_hour, utc->tm_wday + 1, utc->tm_mday, utc->tm_mon, utc->tm_year);
+      }
       if (c & UPDATE_TIME) {
          Update_Time();
          Ds3231_check_alarm();
@@ -498,34 +558,8 @@ int main(void) {
       if (c & SHUTDOWN) {
          break;
       }
-
-      if (state) {
-         if (absolute_time_diff_us(get_absolute_time(), state->ntp_test_time) < 0 && !state->dns_request_sent) {
-            // Set alarm in case udp requests are lost
-            state->ntp_resend_alarm = add_alarm_in_ms(NTP_RESEND_TIME, ntp_failed_handler, state, true);
-
-            // cyw43_arch_lwip_begin/end should be used around calls into lwIP to ensure correct locking.
-            // You can omit them if you are in a callback from lwIP. Note that when using pico_cyw_arch_poll
-            // these calls are a no-op and can be omitted, but it is a good practice to use them in
-            // case you switch the cyw43_arch type later.
-            cyw43_arch_lwip_begin();
-            int err = dns_gethostbyname(NTP_SERVER, &state->ntp_server_address, ntp_dns_found, state);
-            cyw43_arch_lwip_end();
-
-            state->dns_request_sent = true;
-            if (err == ERR_OK) {
-               ntp_request(state); // Cached result
-            } else if (err != ERR_INPROGRESS) { // ERR_INPROGRESS means expect a callback
-               printf("dns request failed\n");
-               ntp_result(state, -1, NULL);
-            }
-         }
-      }
-
       best_effort_wfe_or_timeout(timeout_time);
    }
-   cyw43_arch_deinit();
-   free(state);
    return 0;
 }
 
