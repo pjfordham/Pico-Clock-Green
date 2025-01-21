@@ -15,6 +15,7 @@
 #include "pico/multicore.h"
 #include "pico/cyw43_arch.h"
 
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
 
@@ -351,16 +352,22 @@ enum clock_events_t {
   SHUTDOWN = 0x200
 } clock_events = UPDATE_TIME;
 
+enum clock_modes_t {
+  MODE_DISPLAY_TIME,
+  MODE_ADC_TEMP,
+  MODE_ADC_LIGHT,
+  MODE_ADC_VCC,
+  MODE_END
+} clock_mode;
+
 
 void gpio_callback(uint gpio, uint32_t events) {
    static absolute_time_t SET_FUNCTION_time, UP_time, DOWN_time;
    if(gpio==SQW) {
       clock_events |= UPDATE_TIME;
    } else if (gpio == SET_FUNCTION && (events & GPIO_IRQ_EDGE_FALL) ) {
-      gpio_put(BUZZ,1);
       SET_FUNCTION_time = get_absolute_time();
    } else if (gpio == SET_FUNCTION && (events & GPIO_IRQ_EDGE_RISE) ) {
-      gpio_put(BUZZ,0);
       int64_t us = absolute_time_diff_us( SET_FUNCTION_time, get_absolute_time());
       if (us > 300000) {
          clock_events |= LONG_CLICK_A;
@@ -393,15 +400,24 @@ void gpio_callback(uint gpio, uint32_t events) {
 #define NUM_CHANNELS 5
 
 // Array to hold the latest ADC results for each channel
+volatile uint32_t adc_results_i[NUM_CHANNELS];
 volatile uint16_t adc_results[NUM_CHANNELS];
 
 // ADC interrupt handler
 void adc_interrupt_handler() {
    // Global variable to track the current ADC channel
    static uint8_t current_channel = 0;
+   static uint8_t counter = 0;
 
    // Read the ADC value for the current channel
-   adc_results[current_channel] = adc_fifo_get();
+   adc_results_i[current_channel] += adc_fifo_get();
+
+   // Average ADC over 256 samples
+   if ((++counter) == 0) {
+      adc_results[current_channel] = adc_results_i[current_channel] >> 8;
+      adc_results_i[current_channel] = 0;
+      clock_events |= ADC_UPDATE;
+   }
 
    // Switch to the next ADC channel for the next interrupt
    current_channel = (current_channel + 1) % NUM_CHANNELS;
@@ -409,7 +425,6 @@ void adc_interrupt_handler() {
    // Select the next channel for sampling
    adc_select_input(current_channel);
 
-   clock_events |= ADC_UPDATE;
 
    // Clear the interrupt flag for the ADC (handled automatically by the hardware)
 }
@@ -427,7 +442,6 @@ void core1_entry() {
       printf("failed to connect to WiFi\n");
       return;
    }
-
 
    // Send something to Core0, this should fire the interrupt.
    // multicore_fifo_push_blocking(FLAG_VALUE1);
@@ -476,6 +490,8 @@ void core0_sio_irq() {
    multicore_fifo_clear_irq();
 }
 
+TIME_RTC Time_RTC;
+
 int main(void) {
    port_init();
 
@@ -512,6 +528,11 @@ int main(void) {
    adc_irq_set_enabled(true);
    adc_run(true);
 
+   clock_mode = MODE_DISPLAY_TIME;
+
+//      gpio_put(BUZZ,1);
+//      gpio_put(BUZZ,0);
+
    absolute_time_t timeout_time = make_timeout_time_ms(50);
    while (true) {
 
@@ -526,7 +547,8 @@ int main(void) {
          Set_Time( utc->tm_sec, utc->tm_min, utc->tm_hour, utc->tm_wday + 1, utc->tm_mday, utc->tm_mon, utc->tm_year);
       }
       if (c & UPDATE_TIME) {
-         display_time();
+         Time_RTC = Read_RTC();
+         Time_RTC.dayofweek = Time_RTC.dayofweek - 1;
          Ds3231_check_alarm();
       }
       if (c & ADC_UPDATE) {
@@ -537,23 +559,34 @@ int main(void) {
          }
          a = 1 - a;
       }
-      if (c & LONG_CLICK_A) {
-         display(AUTO_LIGHT);
-      }
       if (c & SHORT_CLICK_A) {
-         clear(AUTO_LIGHT);
+         clock_mode++;
+         if (clock_mode == MODE_END)
+            clock_mode = MODE_DISPLAY_TIME;
       }
-      if (c & LONG_CLICK_B) {
-         show_adc(ADC_Temp);
-      }
-      if (c & SHORT_CLICK_B) {
-         show_adc(ADC_Light);
-      }
-      if (c & LONG_CLICK_C) {
+      if (c & LONG_CLICK_A) {
          reset_usb_boot(0,0); // reboot
       }
-      if (c & SHORT_CLICK_C) {
-         show_adc(ADC_VCC);
+      if (clock_mode == MODE_DISPLAY_TIME) {
+         if (c & UPDATE_TIME || c & SHORT_CLICK_A)
+            display_time();
+         if (c & LONG_CLICK_B) {
+            display(AUTO_LIGHT);
+         }
+         if (c & SHORT_CLICK_B) {
+            clear(AUTO_LIGHT);
+         }
+      }
+      if (c & ADC_UPDATE || c & SHORT_CLICK_A) {
+         if (clock_mode == MODE_ADC_TEMP) {
+            show_adc(ADC_Temp);
+         }
+         if (clock_mode == MODE_ADC_LIGHT) {
+            show_adc(ADC_Light);
+         }
+         if (clock_mode == MODE_ADC_VCC) {
+            show_adc(ADC_VCC);
+         }
       }
       if (c & SHUTDOWN) {
          break;
@@ -692,8 +725,6 @@ static void display_char(unsigned char x, unsigned char dis_char) {
 
 static void display_time()
 {
-   TIME_RTC Time_RTC = Read_RTC();
-   Time_RTC.dayofweek = Time_RTC.dayofweek - 1;
 
    int Set_hour_temp = BCD_to_Byte(Time_RTC.hour) + UTC_OFFSET;
    int day;
