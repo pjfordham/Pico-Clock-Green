@@ -234,6 +234,7 @@ static bool repeating_timer_callback_ms(struct repeating_timer *t);
 
 static void display_char(unsigned char x, unsigned char dis_char);
 static void display_time();
+static void display_alarm_time();
 static void send_data(uint32_t data);
 static void show_adc(int channel);
 
@@ -357,6 +358,7 @@ enum clock_modes_t {
   MODE_ADC_TEMP,
   MODE_ADC_LIGHT,
   MODE_ADC_VCC,
+  MODE_ALARM_SET,
   MODE_END
 } clock_mode;
 
@@ -490,7 +492,7 @@ void core0_sio_irq() {
    multicore_fifo_clear_irq();
 }
 
-TIME_RTC Time_RTC;
+TIME_RTC Time_RTC, Alarm_RTC;
 
 int main(void) {
    port_init();
@@ -530,6 +532,8 @@ int main(void) {
 
    clock_mode = MODE_DISPLAY_TIME;
 
+   Alarm_RTC.dayofweek = 3;
+
 //      gpio_put(BUZZ,1);
 //      gpio_put(BUZZ,0);
 
@@ -566,6 +570,16 @@ int main(void) {
       }
       if (c & LONG_CLICK_A) {
          reset_usb_boot(0,0); // reboot
+      }
+      if (clock_mode == MODE_ALARM_SET) {
+         if (c & SHORT_CLICK_B) {
+            Alarm_RTC.hour = (Alarm_RTC.hour + 1 ) %24;
+            display_alarm_time();
+         }
+         if (c & SHORT_CLICK_C) {
+            Alarm_RTC.hour = (Alarm_RTC.hour + 23 ) %24;
+            display_alarm_time();
+         }
       }
       if (clock_mode == MODE_DISPLAY_TIME) {
          if (c & UPDATE_TIME || c & SHORT_CLICK_A)
@@ -758,5 +772,43 @@ static void display_time()
    display_char(10, ':');
    display_char(13, ((Time_RTC.minutes / 16) + '0'));
    display_char(18, ((Time_RTC.minutes % 16) + '0'));
+   display_weekday(day);
+}
+
+static void display_alarm_time()
+{
+
+   int Set_hour_temp = Alarm_RTC.hour;
+   int day;
+
+   if (Set_hour_temp < 0) {
+      Set_hour_temp += 24;
+      day = ( Alarm_RTC.dayofweek + 6 ) % 7;
+   } else if (Set_hour_temp > 23 ) {
+      Set_hour_temp -= 24;
+      day = ( Alarm_RTC.dayofweek + 1 ) % 7;
+   } else {
+      day = Alarm_RTC.dayofweek;
+   }
+   char hour_temp;
+   if (Set_hour_temp > 12) {
+      hour_temp = Set_hour_temp - 12;
+      display(PM);
+      clear(AM);
+   } else if (Set_hour_temp == 12) {
+      hour_temp = 12;
+      display(PM);
+      clear(AM);
+   } else {
+      hour_temp = Set_hour_temp;
+      display(AM);
+      clear(PM);
+   }
+
+   display_char(0, ((hour_temp / 10) + '0'));
+   display_char(5, ((hour_temp % 10) + '0'));
+   display_char(10, ':');
+   display_char(13, ((Alarm_RTC.minutes / 16) + '0'));
+   display_char(18, ((Alarm_RTC.minutes % 16) + '0'));
    display_weekday(day);
 }
