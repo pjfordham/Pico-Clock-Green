@@ -572,6 +572,9 @@ int main(void) {
          reset_usb_boot(0,0); // reboot
       }
       if (clock_mode == MODE_ALARM_SET) {
+         if (c & SHORT_CLICK_A) {
+            display_alarm_time();
+         }
          if (c & SHORT_CLICK_B) {
             Alarm_RTC.hour = (Alarm_RTC.hour + 1 ) %24;
             display_alarm_time();
@@ -767,7 +770,11 @@ static void display_time()
       clear(PM);
    }
 
-   display_char(0, ((hour_temp / 10) + '0'));
+   if (hour_temp < 10) {
+      display_char(0, ' ');
+   } else {
+      display_char(0, ((hour_temp / 10) + '0'));
+   }
    display_char(5, ((hour_temp % 10) + '0'));
    display_char(10, ':');
    display_char(13, ((Time_RTC.minutes / 16) + '0'));
@@ -779,17 +786,7 @@ static void display_alarm_time()
 {
 
    int Set_hour_temp = Alarm_RTC.hour;
-   int day;
 
-   if (Set_hour_temp < 0) {
-      Set_hour_temp += 24;
-      day = ( Alarm_RTC.dayofweek + 6 ) % 7;
-   } else if (Set_hour_temp > 23 ) {
-      Set_hour_temp -= 24;
-      day = ( Alarm_RTC.dayofweek + 1 ) % 7;
-   } else {
-      day = Alarm_RTC.dayofweek;
-   }
    char hour_temp;
    if (Set_hour_temp > 12) {
       hour_temp = Set_hour_temp - 12;
@@ -799,16 +796,24 @@ static void display_alarm_time()
       hour_temp = 12;
       display(PM);
       clear(AM);
+   } else if (Set_hour_temp == 0) {
+      hour_temp = 12;
+      display(AM);
+      clear(PM);
    } else {
       hour_temp = Set_hour_temp;
       display(AM);
       clear(PM);
    }
 
-   display_char(0, ((hour_temp / 10) + '0'));
+   if (hour_temp < 10) {
+      display_char(0, ' ');
+   } else {
+      display_char(0, ((hour_temp / 10) + '0'));
+   }
    display_char(5, ((hour_temp % 10) + '0'));
    display_char(10, ':');
    display_char(13, ((Alarm_RTC.minutes / 16) + '0'));
    display_char(18, ((Alarm_RTC.minutes % 16) + '0'));
-   display_weekday(day);
+   display_weekday(Alarm_RTC.dayofweek);
 }
