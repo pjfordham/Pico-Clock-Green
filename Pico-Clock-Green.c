@@ -13,7 +13,7 @@
 #include "pico/bootrom.h"
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
-#include "pico/mutex.h"
+#include "pico/critical_section.h"
 #include "pico/cyw43_arch.h"
 
 #include <stdio.h>
@@ -44,20 +44,21 @@ typedef struct NTP_T_ {
 #define NTP_TEST_TIME (300 * 1000) // Get time over NTP every five minutes
 #define NTP_RESEND_TIME (10 * 1000)
 
-auto_init_mutex(utc_mutex);
+critical_section_t utc_crit_sec;
+
 struct tm utc;
 
 // Called with results of operation
 static void ntp_result(NTP_T* state, int status, time_t *result) {
    if (status == 0 && result) {
-      mutex_enter_blocking(&utc_mutex);
+      critical_section_enter_blocking(&utc_crit_sec); 
       if (gmtime_r( result, &utc)) {
-         mutex_exit(&utc_mutex);
+        critical_section_exit(&utc_crit_sec);
          printf("got ntp response: %02d/%02d/%04d %02d:%02d:%02d\n", utc.tm_mday, utc.tm_mon + 1, utc.tm_year + 1900,
                 utc.tm_hour, utc.tm_min, utc.tm_sec);
          multicore_fifo_push_blocking(1);
       } else {
-         mutex_exit(&utc_mutex);
+        critical_section_exit(&utc_crit_sec);
          printf("got bad ntp response\n");
       }
    }
@@ -506,7 +507,7 @@ TIME_RTC Time_RTC, Alarm_RTC;
 int main(void) {
    port_init();
 
-
+   critical_section_init(&utc_crit_sec);
    multicore_fifo_clear_irq();
    multicore_launch_core1(core1_entry);
 
@@ -557,9 +558,9 @@ int main(void) {
 
       if (c & NTP_UPDATE) {
          // Reading UTC without locking is techincally a race but it's probably fine.
-         mutex_enter_blocking(&utc_mutex);
+         critical_section_enter_blocking(&utc_crit_sec);
          Set_Time( utc.tm_sec, utc.tm_min, utc.tm_hour, utc.tm_wday + 1, utc.tm_mday, utc.tm_mon, utc.tm_year);
-         mutex_exit(&utc_mutex);
+         critical_section_exit(&utc_crit_sec);
       }
       if (c & UPDATE_TIME) {
          Time_RTC = Read_RTC();
