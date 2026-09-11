@@ -16,7 +16,7 @@ add_executable(${PROJECT_NAME}
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
         WIFI_SSID=\"PeteNet\"
-        WIFI_PASSWORD=\"PeterFordham\"
+        WIFI_PASSWORD=\"Mahdrof-1979\"
         )
 
 target_include_directories(${PROJECT_NAME} PRIVATE

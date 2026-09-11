@@ -13,6 +13,7 @@
 #include "pico/bootrom.h"
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
+#include "pico/mutex.h"
 #include "pico/cyw43_arch.h"
 
 #include <stdio.h>
@@ -26,7 +27,7 @@
 #include "lwip/pbuf.h"
 #include "lwip/udp.h"
 
-#define UTC_OFFSET (-8)
+#define UTC_OFFSET (-7)
 
 typedef struct NTP_T_ {
     ip_addr_t ntp_server_address;
@@ -43,15 +44,23 @@ typedef struct NTP_T_ {
 #define NTP_TEST_TIME (300 * 1000) // Get time over NTP every five minutes
 #define NTP_RESEND_TIME (10 * 1000)
 
-struct tm *utc;
+auto_init_mutex(utc_mutex);
+struct tm utc;
+
 // Called with results of operation
 static void ntp_result(NTP_T* state, int status, time_t *result) {
-    if (status == 0 && result) {
-        utc = gmtime(result);
-        printf("got ntp response: %02d/%02d/%04d %02d:%02d:%02d\n", utc->tm_mday, utc->tm_mon + 1, utc->tm_year + 1900,
-               utc->tm_hour, utc->tm_min, utc->tm_sec);
-        multicore_fifo_push_blocking(1);
-    }
+   if (status == 0 && result) {
+      mutex_enter_blocking(&utc_mutex);
+      if (gmtime_r( result, &utc)) {
+         mutex_exit(&utc_mutex);
+         printf("got ntp response: %02d/%02d/%04d %02d:%02d:%02d\n", utc.tm_mday, utc.tm_mon + 1, utc.tm_year + 1900,
+                utc.tm_hour, utc.tm_min, utc.tm_sec);
+         multicore_fifo_push_blocking(1);
+      } else {
+         mutex_exit(&utc_mutex);
+         printf("got bad ntp response\n");
+      }
+   }
 
     if (state->ntp_resend_alarm > 0) {
         cancel_alarm(state->ntp_resend_alarm);
@@ -548,7 +557,9 @@ int main(void) {
 
       if (c & NTP_UPDATE) {
          // Reading UTC without locking is techincally a race but it's probably fine.
-         Set_Time( utc->tm_sec, utc->tm_min, utc->tm_hour, utc->tm_wday + 1, utc->tm_mday, utc->tm_mon, utc->tm_year);
+         mutex_enter_blocking(&utc_mutex);
+         Set_Time( utc.tm_sec, utc.tm_min, utc.tm_hour, utc.tm_wday + 1, utc.tm_mday, utc.tm_mon, utc.tm_year);
+         mutex_exit(&utc_mutex);
       }
       if (c & UPDATE_TIME) {
          Time_RTC = Read_RTC();
