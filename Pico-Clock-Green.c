@@ -21,11 +21,12 @@
 #include <time.h>
 
 #include "pico/stdlib.h"
-#include "pico/cyw43_arch.h"
 
+#include "lwip/err.h"
 #include "lwip/dns.h"
 #include "lwip/pbuf.h"
 #include "lwip/udp.h"
+#include "lwip/apps/mqtt.h"
 
 #define UTC_OFFSET (-7)
 
@@ -442,6 +443,58 @@ void adc_interrupt_handler() {
 }
 
 
+static mqtt_client_t *client;
+static ip_addr_t broker_addr;
+static int mqtt_up = 0;
+absolute_time_t mqtt_time;
+
+static void mqtt_publish_cb(void *arg, err_t err)
+{
+   if (err == ERR_OK) {
+      printf("MQTT publish OK\n");
+   } else {
+        printf("MQTT publish failed: %d\n", err);
+   }
+}
+
+static void mqtt_connection_cb(mqtt_client_t *client,
+                               void *arg,
+                               mqtt_connection_status_t status)
+{
+   if (status == MQTT_CONNECT_ACCEPTED) {
+      printf("MQTT connected\n");
+   } else {
+      printf("MQTT connection failed: %d\n", status);
+   }
+
+   static const char *temperature_config =
+      "{"
+      "\"name\":\"Temperature\","
+      "\"unique_id\":\"pico_clock_green_temperature\","
+      "\"state_topic\":\"home/pico/temperature\","
+      "\"device_class\":\"temperature\","
+      "\"state_class\":\"measurement\","
+      "\"unit_of_measurement\":\"°C\","
+      "\"device\":{"
+      "\"identifiers\":[\"pico_clock_green\"],"
+      "\"name\":\"Pico Clock Green\","
+      "\"manufacturer\":\"Raspberry Pi\","
+      "\"model\":\"Pico W\""
+      "}"
+      "}";
+
+   err_t err;
+   err = mqtt_publish(client, "homeassistant/sensor/pico_temperature/config",
+                      temperature_config, strlen(temperature_config),
+                      1, // QoS
+                      1, // retain
+                      mqtt_publish_cb, NULL);
+
+   mqtt_up = 1;
+   mqtt_time = get_absolute_time();
+}
+
+
 void core1_entry() {
    if (cyw43_arch_init()) {
       printf("failed to initialise WiFi\n");
@@ -459,10 +512,34 @@ void core1_entry() {
    // multicore_fifo_push_blocking(FLAG_VALUE1);
 
    NTP_T *state = ntp_init();
+   client = mqtt_client_new();
+   ip4addr_aton("192.168.0.4", &broker_addr);
+
+   struct mqtt_connect_client_info_t connect_params = {
+      .client_id = "pico-clock-green",
+      .client_user = "pico",
+      .client_pass = "pico",
+      .keep_alive = 60,
+      .will_topic = NULL,
+      .will_msg = NULL,
+      .will_qos = 0,
+      .will_retain = 0};
+
+
+   mqtt_client_connect(client, &broker_addr, 1883, mqtt_connection_cb, NULL,
+                       &connect_params);
 
    absolute_time_t timeout_time = make_timeout_time_ms(50);
    while(true) {
-      if (state) {
+      if (mqtt_up) {
+         if (absolute_time_diff_us(mqtt_time, get_absolute_time()) > 5000000) {
+            mqtt_publish(client, "home/pico/temperature", "21.4", 4, 0, 0,
+                         mqtt_publish_cb, NULL);
+            mqtt_time = get_absolute_time();
+         }
+      }
+
+     if (state) {
          if (absolute_time_diff_us(get_absolute_time(), state->ntp_test_time) < 0 && !state->dns_request_sent) {
             // Set alarm in case udp requests are lost
             state->ntp_resend_alarm = add_alarm_in_ms(NTP_RESEND_TIME, ntp_failed_handler, state, true);

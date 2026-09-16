@@ -6,5 +6,8 @@
 //
 // This example uses a common include to avoid repetition
 #include "lwipopts_examples_common.h"
+#define MEMP_NUM_SYS_TIMEOUT 16
+
+#define MQTT_OUTPUT_RINGBUF_SIZE 512
 
 #endif
