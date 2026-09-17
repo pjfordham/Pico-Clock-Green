@@ -140,6 +140,10 @@ static NTP_T* ntp_init(void) {
         printf("failed to allocate state\n");
         return NULL;
     }
+
+    // Schedule the first NTP test to happen 5 seconds from now
+    state->ntp_test_time = make_timeout_time_ms(5000);
+
     state->ntp_pcb = udp_new_ip_type(IPADDR_TYPE_ANY);
     if (!state->ntp_pcb) {
         printf("failed to create pcb\n");
@@ -461,12 +465,12 @@ static void mqtt_connection_cb(mqtt_client_t *client,
                                void *arg,
                                mqtt_connection_status_t status)
 {
-   if (status == MQTT_CONNECT_ACCEPTED) {
-      printf("MQTT connected\n");
-   } else {
+   if (status != MQTT_CONNECT_ACCEPTED) {
       printf("MQTT connection failed: %d\n", status);
+      return;
    }
 
+   printf("MQTT connected\n");
    static const char *temperature_config =
       "{"
       "\"name\":\"Temperature\","
@@ -526,16 +530,20 @@ void core1_entry() {
       .will_retain = 0};
 
 
+   cyw43_arch_lwip_begin();
    mqtt_client_connect(client, &broker_addr, 1883, mqtt_connection_cb, NULL,
                        &connect_params);
+   cyw43_arch_lwip_end();
 
-   absolute_time_t timeout_time = make_timeout_time_ms(50);
    while(true) {
+      absolute_time_t timeout_time = make_timeout_time_ms(50);
       if (mqtt_up) {
          if (absolute_time_diff_us(mqtt_time, get_absolute_time()) > 5000000) {
+            cyw43_arch_lwip_begin();
             mqtt_publish(client, "home/pico/temperature", "21.4", 4, 0, 0,
                          mqtt_publish_cb, NULL);
             mqtt_time = get_absolute_time();
+            cyw43_arch_lwip_end();
          }
       }
 
