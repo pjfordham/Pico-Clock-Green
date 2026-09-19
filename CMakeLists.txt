@@ -10,7 +10,7 @@ pico_sdk_init()
 
 add_executable(${PROJECT_NAME}
         Pico-Clock-Green.c
-        Ds3231.c Ds3231.h
+        Ds3231.c Ds3231.h ntp.h ntp.c
         lwipopts_examples_common.h lwipopts.h
         ziku.h )
 
