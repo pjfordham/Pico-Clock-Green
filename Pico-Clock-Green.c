@@ -373,7 +373,68 @@ static void mqtt_connection_cb(mqtt_client_t *client,
    mqtt_time = get_absolute_time();
 }
 
+#define MQTT_BUFFER_SIZE 16
+#define MQTT_TOPIC_SIZE 128
+#define MQTT_PAYLOAD_SIZE 32
 
+typedef struct {
+   char topic[MQTT_TOPIC_SIZE];
+   char payload[MQTT_PAYLOAD_SIZE];
+} MqttMessage;
+
+typedef struct {
+    MqttMessage entries[MQTT_BUFFER_SIZE];
+    size_t head;
+   size_t tail;
+    size_t count;
+   mutex_t mutex;
+} MqttBuffer;
+
+MqttBuffer mqtt_buffer;
+void mqtt_buffer_init(void)
+{
+    mutex_init(&mqtt_buffer.mutex);
+    mqtt_buffer.head = 0;
+    mqtt_buffer.tail = 0;
+    mqtt_buffer.count = 0;
+}
+
+void send_mqtt(char *topic, char *payload) {
+   mutex_enter_blocking(&mqtt_buffer.mutex);
+   strncpy(mqtt_buffer.entries[mqtt_buffer.head].topic,
+           topic, MQTT_TOPIC_SIZE - 1);
+   mqtt_buffer.entries[mqtt_buffer.head].topic[MQTT_TOPIC_SIZE - 1] = '\0';
+   
+   strncpy(mqtt_buffer.entries[mqtt_buffer.head].payload,
+           payload, MQTT_PAYLOAD_SIZE - 1);
+   mqtt_buffer.entries[mqtt_buffer.head].payload[MQTT_PAYLOAD_SIZE - 1] = '\0';
+   
+   mqtt_buffer.head = (mqtt_buffer.head + 1) % MQTT_BUFFER_SIZE;
+   
+   if (mqtt_buffer.count < MQTT_BUFFER_SIZE)
+      mqtt_buffer.count++;
+   mutex_exit(&mqtt_buffer.mutex);
+
+}
+bool mqtt_buffer_get(MqttMessage *message)
+{
+    bool available = false;
+
+    mutex_enter_blocking(&mqtt_buffer.mutex);
+
+    if (mqtt_buffer.count > 0) {
+        *message = mqtt_buffer.entries[mqtt_buffer.tail];
+
+        mqtt_buffer.tail = (mqtt_buffer.tail + 1) % MQTT_BUFFER_SIZE;
+        mqtt_buffer.count--;
+
+        available = true;
+    }
+
+    mutex_exit(&mqtt_buffer.mutex);
+
+    return available;
+}
 void core1_entry() {
    if (cyw43_arch_init()) {
       printf("failed to initialise WiFi\n");
@@ -404,6 +465,7 @@ void core1_entry() {
       .will_qos = 0,
       .will_retain = 0};
 
+   mqtt_buffer_init();
 
    cyw43_arch_lwip_begin();
    mqtt_client_connect(client, &broker_addr, 1883, mqtt_connection_cb, NULL,
@@ -413,17 +475,23 @@ void core1_entry() {
    while(true) {
       absolute_time_t timeout_time = make_timeout_time_ms(50);
       if (mqtt_up) {
-         if (absolute_time_diff_us(mqtt_time, get_absolute_time()) > 5000000) {
+         MqttMessage message;
+
+         if (mqtt_buffer_get(&message)) {
             cyw43_arch_lwip_begin();
-            mqtt_publish(client, "home/pico/temperature", "21.4", 4, 0, 0,
-                         mqtt_publish_cb, NULL);
-            mqtt_time = get_absolute_time();
+            mqtt_publish(client,
+                         message.topic,
+                         message.payload,
+                         strlen(message.payload),
+                         0, 0,
+                         mqtt_publish_cb,
+                         NULL);
             cyw43_arch_lwip_end();
          }
       }
 
       ntp_run(state);
-  
+
       best_effort_wfe_or_timeout(timeout_time);
    }
    cyw43_arch_deinit();
@@ -537,9 +605,11 @@ int main(void) {
             display_time();
          if (c & LONG_CLICK_B) {
             display(AUTO_LIGHT);
+            send_mqtt("home/pico/temperature", "LONG_CLICK_B");
          }
          if (c & SHORT_CLICK_B) {
             clear(AUTO_LIGHT);
+            send_mqtt("home/pico/temperature", "SHORT_CLICK_B");
          }
       }
       if (c & ADC_UPDATE || c & SHORT_CLICK_A) {
