@@ -1,0 +1,11 @@
+#ifndef _NTP_H
+#define _NTP_H
+
+extern critical_section_t utc_crit_sec;
+extern struct tm utc;
+typedef struct NTP_T NTP_T;
+
+NTP_T* ntp_init(void);
+void   ntp_run(NTP_T *state);
+
+#endif
