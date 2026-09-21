@@ -30,6 +30,8 @@
 #include "ntp.h"
 #include "mqtt.h"
 
+static float get_adc_voltage(int channel);
+
 //-----define IO------------------------------
 
 // Output enable for shaft registers
@@ -407,8 +409,17 @@ int main(void) {
 //      gpio_put(BUZZ,1);
 //      gpio_put(BUZZ,0);
 
-   absolute_time_t timeout_time = make_timeout_time_ms(50);
+   absolute_time_t next_5s = make_timeout_time_ms(5000);
    while (true) {
+      absolute_time_t timeout_time = make_timeout_time_ms(50);
+
+      if (time_reached(next_5s)) {
+         mqtt_send_float("home/pico/ADC_Temp", get_adc_voltage(ADC_Temp));
+         mqtt_send_float("home/pico/ADC_Light", get_adc_voltage(ADC_Light));
+         mqtt_send_float("home/pico/ADC_VCC", get_adc_voltage(ADC_VCC));
+         // Schedule the next one
+         next_5s = delayed_by_ms(next_5s, 5000);
+      }
 
       // We want to avoid racing RMW from irq handlers here so we disable them
       uint32_t i = save_and_disable_interrupts();
@@ -459,12 +470,10 @@ int main(void) {
             display_time();
          if (c & LONG_CLICK_B) {
             display(AUTO_LIGHT);
-            mqtt_send("home/pico/temperature", "LONG_CLICK_B");
          }
          if (c & SHORT_CLICK_B) {
             clear(AUTO_LIGHT);
-            mqtt_send("home/pico/temperature", "SHORT_CLICK_B");
-         }
+          }
       }
       if (c & ADC_UPDATE || c & SHORT_CLICK_A) {
          if (clock_mode == MODE_ADC_TEMP) {
@@ -505,10 +514,14 @@ bool repeating_timer_callback_ms(struct repeating_timer *t) {
    return true;
 }
 
-static void show_adc(int channel) {
+static float get_adc_voltage(int channel) {
    const float conversion_factor = 3.3f / (1 << 12);
    uint16_t result = adc_results[channel];
-   float voltage = 3 * result * conversion_factor;
+   return 3 * result * conversion_factor;
+}
+
+static void show_adc(int channel) {
+   float voltage = get_adc_voltage(channel);
    uint8_t Single_digit = (int)voltage;
    uint8_t Decile = (int)(voltage * 10) % 10;
    uint8_t Percentile = (int)(voltage * 100) % 10;

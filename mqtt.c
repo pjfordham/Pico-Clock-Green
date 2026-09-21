@@ -24,15 +24,14 @@ typedef struct {
 } MqttBuffer;
 
 mqtt_client_t *client = NULL;
-ip_addr_t broker_addr;
 int mqtt_up = 0;
-absolute_time_t mqtt_time;
 
 bool mqtt_buffer_get(MqttMessage *message);
 void mqtt_buffer_init(void);
 void mqtt_connection_cb(mqtt_client_t *client, void *arg,
                         mqtt_connection_status_t status);
 void mqtt_init() {
+   ip_addr_t broker_addr;
    client = mqtt_client_new();
    ip4addr_aton("192.168.0.4", &broker_addr);
 
@@ -74,31 +73,72 @@ void mqtt_connection_cb(mqtt_client_t *client,
    }
 
    printf("MQTT connected\n");
-   static const char *temperature_config =
-      "{"
-      "\"name\":\"Temperature\","
-      "\"unique_id\":\"pico_clock_green_temperature\","
-      "\"state_topic\":\"home/pico/temperature\","
-      "\"device_class\":\"temperature\","
-      "\"state_class\":\"measurement\","
-      "\"unit_of_measurement\":\"°C\","
-      "\"device\":{"
-      "\"identifiers\":[\"pico_clock_green\"],"
-      "\"name\":\"Pico Clock Green\","
-      "\"manufacturer\":\"Raspberry Pi\","
-      "\"model\":\"Pico W\""
-      "}"
-      "}";
 
-   err_t err;
-   err = mqtt_publish(client, "homeassistant/sensor/pico_temperature/config",
-                      temperature_config, strlen(temperature_config),
-                      1, // QoS
-                      1, // retain
-                      mqtt_publish_cb, NULL);
+
+static const char *adc_temp_config =
+   "{"
+   "\"name\":\"ADC_Temp\","
+   "\"unique_id\":\"pico_clock_green_adc_temp\","
+   "\"state_topic\":\"home/pico/ADC_Temp\","
+   "\"device_class\":\"voltage\","
+   "\"state_class\":\"measurement\","
+   "\"unit_of_measurement\":\"V\","
+   "\"device\":{"
+   "\"identifiers\":[\"pico_clock_green\"],"
+   "\"name\":\"Pico Clock Green\","
+   "\"manufacturer\":\"Raspberry Pi\","
+   "\"model\":\"Pico W\""
+   "}"
+   "}";
+
+static const char *adc_light_config =
+   "{"
+   "\"name\":\"ADC_Light\","
+   "\"unique_id\":\"pico_clock_green_adc_light\","
+   "\"state_topic\":\"home/pico/ADC_Light\","
+   "\"device_class\":\"voltage\","
+   "\"state_class\":\"measurement\","
+   "\"unit_of_measurement\":\"V\","
+   "\"device\":{"
+   "\"identifiers\":[\"pico_clock_green\"],"
+   "\"name\":\"Pico Clock Green\","
+   "\"manufacturer\":\"Raspberry Pi\","
+   "\"model\":\"Pico W\""
+   "}"
+   "}";
+
+static const char *adc_vcc_config =
+   "{"
+   "\"name\":\"ADC_VCC\","
+   "\"unique_id\":\"pico_clock_green_adc_vcc\","
+   "\"state_topic\":\"home/pico/ADC_VCC\","
+   "\"device_class\":\"voltage\","
+   "\"state_class\":\"measurement\","
+   "\"unit_of_measurement\":\"V\","
+   "\"device\":{"
+   "\"identifiers\":[\"pico_clock_green\"],"
+   "\"name\":\"Pico Clock Green\","
+   "\"manufacturer\":\"Raspberry Pi\","
+   "\"model\":\"Pico W\""
+   "}"
+   "}";
+
+mqtt_publish(client,
+   "homeassistant/sensor/pico_adc_temp/config",
+   adc_temp_config, strlen(adc_temp_config),
+   1, 1, mqtt_publish_cb, NULL);
+
+mqtt_publish(client,
+   "homeassistant/sensor/pico_adc_light/config",
+   adc_light_config, strlen(adc_light_config),
+   1, 1, mqtt_publish_cb, NULL);
+
+mqtt_publish(client,
+   "homeassistant/sensor/pico_adc_vcc/config",
+   adc_vcc_config, strlen(adc_vcc_config),
+   1, 1, mqtt_publish_cb, NULL); 
 
    mqtt_up = 1;
-   mqtt_time = get_absolute_time();
 }
 
 void mqtt_run() {
@@ -149,6 +189,14 @@ void mqtt_send(char *topic, char *payload) {
    mutex_exit(&mqtt_buffer.mutex);
 
 }
+
+void mqtt_send_float(char *topic, float payload) {
+   char BUFFER[80];
+   snprintf(BUFFER, 79, "%2.2f", payload);
+   mqtt_send(topic, BUFFER);
+}
+
+
 bool mqtt_buffer_get(MqttMessage *message)
 {
    bool available = false;
