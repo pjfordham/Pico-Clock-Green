@@ -7,7 +7,6 @@
 #include "Ds3231.h"
 #include "ziku.h"
 
-#include "hardware/adc.h"
 #include "hardware/pwm.h"
 #include "hardware/sync.h"
 #include "pico/bootrom.h"
@@ -31,8 +30,7 @@
 #include "ntp.h"
 #include "mqtt.h"
 #include "PIO-Display.h"
-
-static float get_adc_voltage(int channel);
+#include "adc.h"
 
 //-----define IO------------------------------
 
@@ -51,17 +49,6 @@ static float get_adc_voltage(int channel);
 #define BUZZ 14
 
 
-#define ADC0 26
-#define ADC1 27
-#define ADC2 28
-#define ADC3 29
-#define ADC4 30
-
-#define ADC_Light 0
-#define ADC_1     1
-#define ADC_2     2
-#define ADC_VCC   3
-#define ADC_Temp  4
 
 #define UP_flag 1
 #define DOWN_flag 0
@@ -113,7 +100,6 @@ static void display_char(unsigned char x, unsigned char dis_char);
 static void display_time();
 static void display_alarm_time();
 static void send_data(uint32_t data);
-static void show_adc(int channel);
 
 // Function to set PWM for a given frequency and duty cycle
 void set_pwm_frequency_and_duty(uint pin, uint wrap_value, uint duty_cycle_percent) {
@@ -167,15 +153,7 @@ static int port_init(void)
    gpio_pull_up(SDA);
    gpio_pull_up(SCL);
 
-   // adc config
-   adc_init();
-
-   // Initialize the GPIOs for ADC (GPIOs 26-30 for ADC0-ADC4)
-   adc_gpio_init(ADC0); // GPIO 26 -> ADC0
-   adc_gpio_init(ADC1); // GPIO 27 -> ADC1
-   adc_gpio_init(ADC2); // GPIO 28 -> ADC2
-   adc_gpio_init(ADC3); // GPIO 29 -> ADC3
-   adc_gpio_init(ADC4); // GPIO 30 -> ADC4
+   init_adc();
 
    // Set display brightness
    gpio_set_function(OE, GPIO_FUNC_PWM);
@@ -261,39 +239,6 @@ void gpio_callback(uint gpio, uint32_t events) {
    }
 }
 
-// Number of ADC channels to monitor
-#define NUM_CHANNELS 5
-
-// Array to hold the latest ADC results for each channel
-volatile uint32_t adc_results_i[NUM_CHANNELS];
-volatile uint16_t adc_results[NUM_CHANNELS];
-
-// ADC interrupt handler
-void adc_interrupt_handler() {
-   // Global variable to track the current ADC channel
-   static uint8_t current_channel = 0;
-   static uint8_t counter = 0;
-
-   // Read the ADC value for the current channel
-   adc_results_i[current_channel] += adc_fifo_get();
-
-   // Average ADC over 256 samples
-   if ((++counter) == 0) {
-      adc_results[current_channel] = adc_results_i[current_channel] >> 8;
-      adc_results_i[current_channel] = 0;
-      clock_events |= ADC_UPDATE;
-   }
-
-   // Switch to the next ADC channel for the next interrupt
-   current_channel = (current_channel + 1) % NUM_CHANNELS;
-
-   // Select the next channel for sampling
-   adc_select_input(current_channel);
-
-
-   // Clear the interrupt flag for the ADC (handled automatically by the hardware)
-}
-
 
 
 void core1_entry() {
@@ -337,6 +282,7 @@ void core0_sio_irq() {
 }
 
 TIME_RTC Time_RTC, Alarm_RTC;
+static void show_adc(int channel);
 
 int main(void) {
    port_init();
@@ -348,17 +294,10 @@ int main(void) {
    irq_set_exclusive_handler(SIO_FIFO_IRQ_NUM(0), core0_sio_irq);
    irq_set_enabled(SIO_FIFO_IRQ_NUM(0), true);
 
-   // Set up ADC to trigger interrupt after a new sample is available
-   adc_select_input(0);  // Start with ADC0 (GPIO 26)
-   adc_fifo_setup(true, true, 1, false, false);  // Set up FIFO to trigger an interrupt after 1 sample
-   // Set up the ADC clock divider to slow down the ADC to 1 sample per second
-   adc_set_clkdiv(12500000.0f);  // This will slow the ADC to about 1 Hz per channel (1250 clock div for 125 kHz default ADC clock)
 
    init_DS3231();
 
-   irq_set_exclusive_handler(ADC_IRQ_FIFO, adc_interrupt_handler);  // Set interrupt handler
-   irq_set_enabled(ADC_IRQ_FIFO, true);  // Enable the ADC interrupt
-
+ 
    gpio_set_irq_enabled_with_callback(SQW, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
    gpio_set_irq_enabled(SET_FUNCTION, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE,  true);
    gpio_set_irq_enabled(UP, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE,  true);
@@ -369,9 +308,8 @@ int main(void) {
 
    Set_alarm1_clock( ALARM_MODE_SEC_MATCHED, 0,0,0,0 );
 
-   adc_irq_set_enabled(true);
-   adc_run(true);
-
+   run_adc();
+   
    clock_mode = MODE_DISPLAY_TIME;
 
    Alarm_RTC.dayofweek = 3;
@@ -382,7 +320,6 @@ int main(void) {
    absolute_time_t next_5s = make_timeout_time_ms(5000);
    while (true) {
       absolute_time_t timeout_time = make_timeout_time_ms(50);
-
       if (time_reached(next_5s)) {
          mqtt_send_float("home/pico/ADC_Temp", get_adc_voltage(ADC_Temp));
          mqtt_send_float("home/pico/ADC_Light", get_adc_voltage(ADC_Light));
@@ -394,6 +331,8 @@ int main(void) {
       // We want to avoid racing RMW from irq handlers here so we disable them
       uint32_t i = save_and_disable_interrupts();
       enum clock_events_t c = clock_events;
+      c |= adc_event ? ADC_UPDATE : 0;
+      adc_event = 0;
       clock_events = 0;
       restore_interrupts(i);
 
@@ -465,11 +404,6 @@ int main(void) {
 }
 
 
-static float get_adc_voltage(int channel) {
-   const float conversion_factor = 3.3f / (1 << 12);
-   uint16_t result = adc_results[channel];
-   return 3 * result * conversion_factor;
-}
 
 static void show_adc(int channel) {
    float voltage = get_adc_voltage(channel);
