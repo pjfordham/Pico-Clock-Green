@@ -29,6 +29,7 @@
 
 #include "ntp.h"
 #include "mqtt.h"
+#include "PIO-Display.h"
 
 static float get_adc_voltage(int channel);
 
@@ -38,20 +39,6 @@ static float get_adc_voltage(int channel);
 #define	OE	13
 #define	OE_OPEN		gpio_put(OE, 0)
 #define	OE_CLOSE	gpio_put(OE, 1)
-
-#define	SDI	11
-#define	SDI_LOW		gpio_put(SDI, 0)
-#define	SDI_HIGH	gpio_put(SDI, 1)
-
-#define	CLK	10
-#define	CLK_LOW		gpio_put(CLK, 0)
-#define	CLK_HIGH	gpio_put(CLK, 1)
-
-#define	LE	12
-#define	A0	16
-#define	A1	18
-#define	A2	22
-
 
 //定义按键
 #define SET_FUNCTION 2
@@ -112,8 +99,6 @@ struct {
    {0x24, 0}
 };
 
-static uint32_t display_buffer[8];
-
 static void display(uint8_t x) {
    display_buffer[indicator[x].line]|=indicator[x].bits;
 }
@@ -122,7 +107,6 @@ static void clear(uint8_t x) {
    display_buffer[indicator[x].line]&=~indicator[x].bits;
 }
 
-static bool repeating_timer_callback_ms(struct repeating_timer *t);
 
 static void display_char(unsigned char x, unsigned char dis_char);
 static void display_time();
@@ -159,14 +143,7 @@ void beep(uint16_t period, uint16_t duration) {
 static int port_init(void)
 {
    stdio_init_all();
-   gpio_init(A0);
-   gpio_init(A1);
-   gpio_init(A2);
-
-   gpio_init(SDI);
-   gpio_init(LE);
    gpio_init(OE);
-   gpio_init(CLK);
    gpio_init(SQW);
    gpio_init(BUZZ);
    gpio_init(SET_FUNCTION);
@@ -180,14 +157,7 @@ static int port_init(void)
    gpio_pull_up(UP);
    gpio_pull_up(DOWN);
 
-   gpio_set_dir(A0, GPIO_OUT);
-   gpio_set_dir(A1, GPIO_OUT);
-   gpio_set_dir(A2, GPIO_OUT);
-   gpio_set_dir(SDI, GPIO_OUT);
    gpio_set_dir(OE, GPIO_OUT);
-   gpio_set_dir(LE, GPIO_OUT);
-   gpio_set_dir(CLK, GPIO_OUT);
-
    gpio_set_dir(SQW, GPIO_IN);
    gpio_set_dir(BUZZ, GPIO_OUT);
 
@@ -369,6 +339,9 @@ TIME_RTC Time_RTC, Alarm_RTC;
 
 int main(void) {
    port_init();
+   display_init();
+   struct repeating_timer timer;
+   add_repeating_timer_ms(1, repeating_timer_callback_ms, NULL, &timer);
 
    multicore_fifo_clear_irq();
    multicore_launch_core1(core1_entry);
@@ -392,10 +365,8 @@ int main(void) {
    gpio_set_irq_enabled(UP, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE,  true);
    gpio_set_irq_enabled(DOWN, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE,  true);
 
-   struct repeating_timer timer;
    int a  = 0;
 
-   add_repeating_timer_ms(1, repeating_timer_callback_ms, NULL, &timer);
 
    Set_alarm1_clock( ALARM_MODE_SEC_MATCHED, 0,0,0,0 );
 
@@ -494,25 +465,6 @@ int main(void) {
    return 0;
 }
 
-bool repeating_timer_callback_ms(struct repeating_timer *t) {
-
-   // Display muxing
-   static unsigned char CS_cnt = 0;
-
-   send_data(display_buffer[CS_cnt]);
-
-   gpio_put(LE, 1);
-   gpio_put(LE, 0);
-
-   gpio_put(A0, (CS_cnt & 0x1) >> 0);
-   gpio_put(A1, (CS_cnt & 0x2) >> 1);
-   gpio_put(A2, (CS_cnt & 0x4) >> 2);
-
-   CS_cnt++;
-   CS_cnt &= 0x7;
-
-   return true;
-}
 
 static float get_adc_voltage(int channel) {
    const float conversion_factor = 3.3f / (1 << 12);
@@ -552,20 +504,6 @@ static void display_weekday(unsigned char x)
    display_buffer[0] |= day_mask[x];
 }
 
-static void send_data(uint32_t data)
-{
-   for (unsigned char i = 0; i < 32; i++) {
-      CLK_LOW;
-
-      SDI_LOW;
-
-      if (data & 0x01)
-         SDI_HIGH;
-      data >>= 1;
-
-      CLK_HIGH;
-   }
-}
 
 static void display_char(unsigned char x, unsigned char dis_char) {
    x += disp_offset;
