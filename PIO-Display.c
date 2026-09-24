@@ -164,8 +164,3 @@ int display_init() {
 
    return offset_data << 16 | offset_mux;
 }
-
-
-bool repeating_timer_callback_ms(struct repeating_timer *t) {
-   return true;
-}

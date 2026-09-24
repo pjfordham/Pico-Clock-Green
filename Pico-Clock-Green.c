@@ -340,9 +340,7 @@ TIME_RTC Time_RTC, Alarm_RTC;
 
 int main(void) {
    port_init();
-   int offsets = display_init();
-   struct repeating_timer timer;
-   add_repeating_timer_ms(1, repeating_timer_callback_ms, NULL, &timer);
+   display_init();
 
    multicore_fifo_clear_irq();
    multicore_launch_core1(core1_entry);

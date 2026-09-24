@@ -7,7 +7,6 @@
 
 extern uint32_t display_buffer[8];
 int display_init();
-bool repeating_timer_callback_ms(struct repeating_timer *t);
 void display_print();
 
 #endif
