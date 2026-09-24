@@ -6,7 +6,8 @@
 #include "pico/time.h"
 
 extern uint32_t display_buffer[8];
-void display_init();
+int display_init();
 bool repeating_timer_callback_ms(struct repeating_timer *t);
+void display_print();
 
 #endif

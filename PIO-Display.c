@@ -1,71 +1,171 @@
 #include "PIO-Display.h"
-uint32_t display_buffer[8];
 #include "hardware/gpio.h"
-#include "pico/time.h"
+#include "hardware/pio.h"
+#include "hardware/dma.h"
+#include "display_spi.pio.h"
+#include <stdio.h>
 
-#define	SDI	11
-#define	SDI_LOW		gpio_put(SDI, 0)
-#define	SDI_HIGH	gpio_put(SDI, 1)
+#define NUM_ROWS 8
+uint32_t display_buffer[8] __attribute__((aligned(32)));
+// Replace the old row_mux_values declaration at the top of PIO-Display.c:
+static uint32_t row_mux_values[NUM_ROWS] __attribute__((aligned(32))) = {
+   0x00, // Row 0 (Binary 000) -> Pins: 22=0, 18=0, 16=0 (Hex 0x00)
+   0x01, // Row 1 (Binary 001) -> Pins: 22=0, 18=0, 16=1 (Hex 0x01)
+   0x04, // Row 2 (Binary 010) -> Pins: 22=0, 18=1, 16=0 (Hex 0x04)
+   0x05, // Row 3 (Binary 011) -> Pins: 22=0, 18=1, 16=1 (Hex 0x05)
+   0x40, // Row 4 (Binary 100) -> Pins: 22=1, 18=0, 16=0 (Hex 0x40)
+   0x41, // Row 5 (Binary 101) -> Pins: 22=1, 18=0, 16=1 (Hex 0x41)
+   0x44, // Row 6 (Binary 110) -> Pins: 22=1, 18=1, 16=0 (Hex 0x44)
+   0x45  // Row 7 (Binary 111) -> Pins: 22=1, 18=1, 16=1 (Hex 0x45)
+};
 
-#define	CLK	10
-#define	CLK_LOW		gpio_put(CLK, 0)
-#define	CLK_HIGH	gpio_put(CLK, 1)
+#define SDI  11
+#define CLK  10
+#define LE   12
+#define A0   16
+#define A1   18
+#define A2   22
 
-#define	LE	12
-#define	A0	16
-#define	A1	18
-#define	A2	22
+static PIO display_pio = pio0;
+static uint sm_data = 0;
+static uint sm_mux = 1;
+static int data_dma_chan;
+static int mux_dma_chan;
+uint offset_data;
+uint offset_mux;
 
+void display_print() {
+   uint32_t pc_data = pio_sm_get_pc(pio0, 0);
+   uint32_t pc_mux  = pio_sm_get_pc(pio0, 1);
 
-static void send_data(uint32_t data)
-{
-   for (unsigned char i = 0; i < 32; i++) {
-      CLK_LOW;
-
-      SDI_LOW;
-
-      if (data & 0x01)
-         SDI_HIGH;
-      data >>= 1;
-
-      CLK_HIGH;
-   }
+   printf("PIO DATA OF: %lu | MUX OF: %lu\n", offset_data, offset_mux);
+   printf("PIO DATA PC: %lu | MUX PC: %lu\n", pc_data - offset_data, pc_mux-offset_mux);
 }
 
- bool repeating_timer_callback_ms(struct repeating_timer *t) {
+int display_init() {
+   // 1. Initialize hardware addresses for the Data Shifter (SM0)
+   sm_data = pio_claim_unused_sm(display_pio, true);
+   sm_mux = pio_claim_unused_sm(display_pio, true);
 
-   // Display muxing
-   static unsigned char CS_cnt = 0;
+   offset_data = pio_add_program(display_pio, &display_data_program);
+   pio_sm_config c_data = display_data_program_get_default_config(offset_data);
 
-   send_data(display_buffer[CS_cnt]);
+   sm_config_set_out_pins(&c_data, SDI, 1);
+   sm_config_set_sideset_pins(&c_data, CLK);
+   sm_config_set_set_pins(&c_data, LE, 1);
 
-   gpio_put(LE, 1);
-   gpio_put(LE, 0);
+   pio_gpio_init(display_pio, SDI);
+   pio_gpio_init(display_pio, CLK);
+   pio_gpio_init(display_pio, LE);
+   pio_sm_set_consecutive_pindirs(display_pio, sm_data, SDI, 1, true);
+   pio_sm_set_consecutive_pindirs(display_pio, sm_data, CLK, 1, true);
+   pio_sm_set_consecutive_pindirs(display_pio, sm_data, LE, 1, true);
 
-   gpio_put(A0, (CS_cnt & 0x1) >> 0);
-   gpio_put(A1, (CS_cnt & 0x2) >> 1);
-   gpio_put(A2, (CS_cnt & 0x4) >> 2);
+   sm_config_set_out_shift(&c_data, true, true, 32);
+   sm_config_set_clkdiv(&c_data, 80.0f);
+   pio_sm_init(display_pio, sm_data, offset_data, &c_data);
 
-   CS_cnt++;
-   CS_cnt &= 0x7;
+   // 2. Initialize hardware addresses for the Row Muxer (SM1)
+   offset_mux = pio_add_program(display_pio, &display_mux_program);
+   pio_sm_config c_mux = display_mux_program_get_default_config(offset_mux);
 
+   // Setup A0 as the base OUT pin for SM1
+   sm_config_set_out_pins(&c_mux, A0, 7);
+   sm_config_set_out_shift(&c_mux, true, false, 32); // Autopull 3 bits at a time
+   sm_config_set_sideset_pins(&c_mux, LE);
+   sm_config_set_clkdiv(&c_mux, 80.0f);
+   pio_sm_init(display_pio, sm_mux, offset_mux, &c_mux);
+   pio_sm_set_consecutive_pindirs(display_pio, sm_mux, A0, 7, true);
+   // Hand the pins over to the PIO subsystem block
+   pio_gpio_init(display_pio, A0); // 16
+   pio_gpio_init(display_pio, A1); // 18
+   pio_gpio_init(display_pio, A2); // 22
+
+   // Explicitly configure intermediate pins as well to guarantee continuity
+   pio_gpio_init(display_pio, 17);
+   pio_gpio_init(display_pio, 19);
+   pio_gpio_init(display_pio, 20);
+   pio_gpio_init(display_pio, 21);
+
+
+   // Override the pin mappings for SM1 so it specifically jumps over the hardware gaps!
+   // This tells the PIO: Pin 0 = A0 (16), Pin 1 = A1 (18), Pin 2 = A2 (22)
+   // By re-routing the crossbar config, we bypass the compilation error and leave middle pins safe.
+   //pio_sm_set_pins_with_mask(display_pio, sm_mux, (1 << A0) | (1 << A1) | (1 << A2), (1 << A0) | (1 << A1) | (1 << A2));
+
+   // 3. Setup background DATA DMA Channel (Streams display_buffer array to SM0)
+   data_dma_chan = dma_claim_unused_channel(true);
+   dma_channel_config data_config = dma_channel_get_default_config(data_dma_chan);
+   channel_config_set_transfer_data_size(&data_config, DMA_SIZE_32);
+   channel_config_set_read_increment(&data_config, true);
+   channel_config_set_write_increment(&data_config, false);
+   channel_config_set_dreq(&data_config, pio_get_dreq(display_pio, sm_data, true));
+
+   // --- TURN ON THE HARDWARE RING BUFFER LOOP ---
+   // Parameters: false (we are wrapping the READ pointer),
+   // 5 (because 2^5 = 32 bytes, which is exactly the size of an 8-word 32-bit array)
+   channel_config_set_ring(&data_config, false, 5);
+
+   // --- REMOVE SELF-CHAINING ---
+   // By setting the transfer count to an incredibly massive number (like 0xFFFFFFFF),
+   // combined with the ring buffer wrapping, it will loop for days without stopping.
+   dma_channel_configure(
+      data_dma_chan,
+      &data_config,
+      &display_pio->txf[sm_data], // Target: PIO FIFO
+      display_buffer,               // Source: Your memory-aligned array
+      0xFFFFFFFF,                   // Transfer essentially forever
+      false                          // Fire immediately!
+      );
+
+   // 4. Setup background MUX DMA Channel (Streams row changes in lockstep to SM1)
+   mux_dma_chan = dma_claim_unused_channel(true);
+   dma_channel_config mux_config = dma_channel_get_default_config(mux_dma_chan);
+   channel_config_set_transfer_data_size(&mux_config, DMA_SIZE_32);
+   channel_config_set_read_increment(&mux_config, true);
+   channel_config_set_write_increment(&mux_config, false);
+   channel_config_set_dreq(&mux_config, pio_get_dreq(display_pio, sm_mux, true));
+   channel_config_set_ring(&mux_config, false, 5);
+
+   dma_channel_configure(
+      mux_dma_chan,
+      &mux_config,
+      &display_pio->txf[sm_mux], // Target: PIO FIFO
+      row_mux_values,               // Source: Your memory-aligned array
+      0xFFFFFFFF,                   // Transfer essentially forever
+      false                          // Fire immediately!
+      );
+   // // Fire pipelines!
+   // dma_channel_configure(data_dma_chan, &data_config, &display_pio->txf[sm_data], display_buffer, NUM_ROWS, true);
+   // dma_channel_configure(mux_dma_chan, &mux_config, &display_pio->txf[sm_mux], row_mux_values, NUM_ROWS, true);
+
+   // // Enable state machines
+   // pio_sm_set_enabled(display_pio, sm_mux, true);
+   // pio_sm_set_enabled(display_pio, sm_data, true);
+
+
+   // 1. First, set up your DMA channel configurations completely,
+   // BUT set the final parameter to 'false' so they don't fire yet!
+//    dma_channel_configure(data_dma_chan, &data_config, &display_pio->txf[sm_data], display_buffer, NUM_ROWS, false);
+   //   dma_channel_configure(mux_dma_chan, &mux_config, &display_pio->txf[sm_mux], row_mux_values, NUM_ROWS, false);
+
+   // 2. Clear out any junk or random states currently blocking the PIO FIFOs
+   pio_sm_clear_fifos(display_pio, sm_data);
+   pio_sm_clear_fifos(display_pio, sm_mux);
+
+   // 3. CRITICAL STEP: Start BOTH state machines at the exact same millisecond
+   // using the global clock control register. This forces them to align perfectly.
+   pio_enable_sm_mask_in_sync(display_pio, (1 << sm_data) | (1 << sm_mux));
+
+   // 4. Now that the PIO is awake and actively screaming for data (asserting DREQ),
+   // manually trigger the DMA pipelines to start streaming!
+   dma_channel_start(data_dma_chan);
+   dma_channel_start(mux_dma_chan);
+
+   return offset_data << 16 | offset_mux;
+}
+
+
+bool repeating_timer_callback_ms(struct repeating_timer *t) {
    return true;
-}
-
-void display_init() {
-   gpio_init(A0);
-   gpio_init(A1);
-   gpio_init(A2);
-
-   gpio_init(SDI);
-   gpio_init(LE);
-   gpio_init(CLK);
-   gpio_set_dir(A0, GPIO_OUT);
-   gpio_set_dir(A1, GPIO_OUT);
-   gpio_set_dir(A2, GPIO_OUT);
-   gpio_set_dir(SDI, GPIO_OUT);
-   gpio_set_dir(LE, GPIO_OUT);
-   gpio_set_dir(CLK, GPIO_OUT);
-
-
 }

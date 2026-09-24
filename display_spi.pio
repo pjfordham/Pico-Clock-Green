@@ -1,0 +1,28 @@
+.program display_data
+.side_set 1 optional
+
+; State Machine 0: Shifts 32 data bits sequentially, pulses LE, then signals the Row Muxer
+.wrap_target
+    set x, 31           ; Loop counter for 32 bits
+bit_loop:
+    out pins, 1   side 0 ; Shift 1 data bit to SDI, drive CLK low
+    jmp x-- bit_loop side 1 ; Drive CLK high, loop 32 times
+
+    ; --- 32 bits sequentially shifted! Pulse the Latch ---
+    ;set pins, 1      ; Drive LE high
+    ;set pins, 0      ; Drive LE low
+
+    ; --- Signal the Row Muxer ---
+    irq wait 0          ; Set IRQ 0 and stall until SM1 clears it
+.wrap
+
+
+.program display_mux
+.side_set 1
+; State Machine 1: Grabs explicit raw bit configurations to step exactly A0, A1, A2
+.wrap_target
+    wait 1 irq 0 side 0         ; Wait for SM0 to finish shifting a frame
+    pull block   side 0
+    out pins, 7  side 1        ; Pull 3 bits from its own FIFO queue and dump them directly to A0, A1, A2
+    irq clear 0  side 0        ; Release SM0 to continue
+.wrap

@@ -24,6 +24,9 @@ target_include_directories(${PROJECT_NAME} PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
         )
 
+# Compile PIO files before building the executable
+pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/display_spi.pio)
+
 # Pull in our pico_stdlib which pulls in commonly used features
 target_link_libraries(${PROJECT_NAME}
   pico_cyw43_arch_lwip_threadsafe_background
@@ -32,6 +35,8 @@ target_link_libraries(${PROJECT_NAME}
   hardware_i2c
   hardware_adc
   hardware_pwm
+  hardware_pio
+  hardware_dma
   pico_multicore  )
 
 # enable usb or uart output

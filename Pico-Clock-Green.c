@@ -15,6 +15,7 @@
 #include "pico/multicore.h"
 #include "pico/critical_section.h"
 #include "pico/cyw43_arch.h"
+#include "hardware/pio.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -339,7 +340,7 @@ TIME_RTC Time_RTC, Alarm_RTC;
 
 int main(void) {
    port_init();
-   display_init();
+   int offsets = display_init();
    struct repeating_timer timer;
    add_repeating_timer_ms(1, repeating_timer_callback_ms, NULL, &timer);
 
@@ -388,8 +389,8 @@ int main(void) {
          mqtt_send_float("home/pico/ADC_Temp", get_adc_voltage(ADC_Temp));
          mqtt_send_float("home/pico/ADC_Light", get_adc_voltage(ADC_Light));
          mqtt_send_float("home/pico/ADC_VCC", get_adc_voltage(ADC_VCC));
-         // Schedule the next one
-         next_5s = delayed_by_ms(next_5s, 5000);
+         display_print();
+          next_5s = delayed_by_ms(next_5s, 5000);
       }
 
       // We want to avoid racing RMW from irq handlers here so we disable them
