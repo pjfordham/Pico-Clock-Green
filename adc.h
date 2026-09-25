@@ -16,6 +16,7 @@
 extern int adc_event;
 float get_adc_voltage(int channel);
 void adc_interrupt_handler();
+float read_core_temperature(void);
 
 void init_adc();
 void run_adc();

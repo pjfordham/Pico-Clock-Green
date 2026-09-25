@@ -3,12 +3,11 @@
 //
 #include "Ds3231.h"
 #include "hardware/i2c.h"
+#include "hardware/gpio.h"
 
 #include <string.h>
 
-//定义 IIC
-#define Address 0x68
-#define Address_ADS 0x48
+#define I2C_ADDR_DS3231   0x68 // RTC
 #define I2C_PORT i2c1
 
 uint8_t DS3231_ReadReg[17];
@@ -50,22 +49,31 @@ void ByteData()
     }
 }
 
+// i2c bus
+#define SDA 6
+#define SCL 7
+
 void init_DS3231()
 {
-    uint8_t val[2];
+   gpio_set_function(SDA, GPIO_FUNC_I2C);
+   gpio_set_function(SCL, GPIO_FUNC_I2C);
+   gpio_pull_up(SDA);
+   gpio_pull_up(SCL);
+
+   uint8_t val[2];
     i2c_init(I2C_PORT, 100000);
     val[0] = DS3231_REG_CONTROL;
     val[1] = Control_default;
-    i2c_write_blocking(I2C_PORT,Address,val,2,false);
+    i2c_write_blocking(I2C_PORT,I2C_ADDR_DS3231,val,2,false);
     val[0] = DS3231_REG_STATUS;
     val[1] = Status_default;
-    i2c_write_blocking(I2C_PORT,Address,val,2,false);
+    i2c_write_blocking(I2C_PORT,I2C_ADDR_DS3231,val,2,false);
 }
 void set_min(uint8_t min)
 {
     uint8_t setMin[3] = {0x00,0x00,0x00};
     setMin[2] = decToBcd(min);
-    i2c_write_blocking(I2C_PORT,Address,setMin,3,false);
+    i2c_write_blocking(I2C_PORT,I2C_ADDR_DS3231,setMin,3,false);
 
 }
 
@@ -73,14 +81,14 @@ void set_hour(uint8_t hour)
 {
     uint8_t setHour[2] = {0x02,0x00};
     setHour[1] = decToBcd(hour);
-    i2c_write_blocking(I2C_PORT,Address,setHour,2,false);
+    i2c_write_blocking(I2C_PORT,I2C_ADDR_DS3231,setHour,2,false);
 
 }
 void set_year(uint8_t year)
 {
     uint8_t setYear[2] = {0x06,0x00};
     setYear[1] = decToBcd(year);
-    i2c_write_blocking(I2C_PORT,Address,setYear,2,false);
+    i2c_write_blocking(I2C_PORT,I2C_ADDR_DS3231,setYear,2,false);
 
 }
 
@@ -88,19 +96,19 @@ void set_dayofmouth(uint8_t dayofmouth)
 {
     uint8_t setDom[2] = {0x04,0x00};
     setDom[1] = decToBcd(dayofmouth);
-    i2c_write_blocking(I2C_PORT,Address,setDom,2,false);
+    i2c_write_blocking(I2C_PORT,I2C_ADDR_DS3231,setDom,2,false);
 }
 void set_dayofweekday(uint8_t dayofweek)
 {
     uint8_t setDow[2] = {0x03,0x00};
     setDow[1] = decToBcd(dayofweek);
-    i2c_write_blocking(I2C_PORT,Address,setDow,2,false);
+    i2c_write_blocking(I2C_PORT,I2C_ADDR_DS3231,setDow,2,false);
 }
 void set_month(uint8_t mouth)
 {
     uint8_t setMouth[2] = {0x05,0x00};
     setMouth[1] = decToBcd(mouth);
-    i2c_write_blocking(I2C_PORT,Address,setMouth,2,false);
+    i2c_write_blocking(I2C_PORT,I2C_ADDR_DS3231,setMouth,2,false);
 }
 
 void Set_Time(uint8_t sec,uint8_t min,uint8_t hour, uint8_t dow,uint8_t dom,uint8_t month,uint8_t year){
@@ -114,7 +122,7 @@ void Set_Time(uint8_t sec,uint8_t min,uint8_t hour, uint8_t dow,uint8_t dom,uint
     set_time[6]=decToBcd(month);
     set_time[7]=decToBcd(year);
 
-    i2c_write_blocking(I2C_PORT,Address,set_time,8,false);
+    i2c_write_blocking(I2C_PORT,I2C_ADDR_DS3231,set_time,8,false);
 
 
 }
@@ -123,8 +131,8 @@ TIME_RTC Read_RTC()
     TIME_RTC timeRtc;
     unsigned  char RTC_buf[7];
     uint8_t val = 0x00;
-    i2c_write_blocking(I2C_PORT, Address, &val, 1, true);
-    i2c_read_blocking(I2C_PORT, Address, RTC_buf, 7, false);
+    i2c_write_blocking(I2C_PORT, I2C_ADDR_DS3231, &val, 1, true);
+    i2c_read_blocking(I2C_PORT, I2C_ADDR_DS3231, RTC_buf, 7, false);
     timeRtc.seconds=RTC_buf[0];
     timeRtc.minutes=RTC_buf[1];
     timeRtc.hour=RTC_buf[2];
@@ -139,8 +147,8 @@ void Ds3231_SQW_enable(bool enable)
     uint8_t control;
     uint8_t val[2];
     val[0] = DS3231_REG_CONTROL;
-    i2c_write_blocking(I2C_PORT, Address, &val[0], 1, true);
-    i2c_read_blocking(I2C_PORT,Address, &control,1,false);
+    i2c_write_blocking(I2C_PORT, I2C_ADDR_DS3231, &val[0], 1, true);
+    i2c_read_blocking(I2C_PORT,I2C_ADDR_DS3231, &control,1,false);
     if (enable) {
         control |=  0b01000000; // set BBSQW to 1
         control &=  ~0b00000100; // set INTCN to 1
@@ -150,7 +158,7 @@ void Ds3231_SQW_enable(bool enable)
     }
 
     val[1] = control;
-    i2c_write_blocking(I2C_PORT,Address,val,2,false);
+    i2c_write_blocking(I2C_PORT,I2C_ADDR_DS3231,val,2,false);
 
 }
 
@@ -187,14 +195,14 @@ void Set_alarm1_clock(uint8_t mode,uint8_t sec,uint8_t min,uint8_t hour,uint8_t 
     }
     uint8_t start_address = DS3231_REG_A1S;
     uint8_t val[5]={start_address,alarmSecond,alarmMinute,alarmHour,alarmDate};
-    i2c_write_blocking(I2C_PORT,Address,val,5,false);
+    i2c_write_blocking(I2C_PORT,I2C_ADDR_DS3231,val,5,false);
     uint8_t addr_reg_val[2]= {DS3231_REG_CONTROL,0x00};
 
-    i2c_write_blocking(I2C_PORT, Address,&addr_reg_val[0], 1, true);
-    i2c_read_blocking(I2C_PORT,Address, &addr_reg_val[1],1,false);
+    i2c_write_blocking(I2C_PORT, I2C_ADDR_DS3231,&addr_reg_val[0], 1, true);
+    i2c_read_blocking(I2C_PORT,I2C_ADDR_DS3231, &addr_reg_val[1],1,false);
     addr_reg_val[1] |= 0x01;
     addr_reg_val[1] |= 0x04;
-    i2c_write_blocking(I2C_PORT, Address,addr_reg_val, 2, false);
+    i2c_write_blocking(I2C_PORT, I2C_ADDR_DS3231,addr_reg_val, 2, false);
 
 }
 void  Set_alarm2_clock(uint8_t min,uint8_t hour,uint8_t date)
@@ -205,31 +213,31 @@ void  Set_alarm2_clock(uint8_t min,uint8_t hour,uint8_t date)
     alarmDate |= 0x80;
     uint8_t start_address = DS3231_REG_A2M;
     uint8_t val[4]={start_address,alarmMinute,alarmHour,alarmDate};
-    i2c_write_blocking(I2C_PORT,Address,val,4,false);
+    i2c_write_blocking(I2C_PORT,I2C_ADDR_DS3231,val,4,false);
     uint8_t addr_reg_val[2]= {DS3231_REG_CONTROL,0x00};
 
-    i2c_write_blocking(I2C_PORT, Address,&addr_reg_val[0], 1, true);
-    i2c_read_blocking(I2C_PORT,Address, &addr_reg_val[1],1,false);
+    i2c_write_blocking(I2C_PORT, I2C_ADDR_DS3231,&addr_reg_val[0], 1, true);
+    i2c_read_blocking(I2C_PORT,I2C_ADDR_DS3231, &addr_reg_val[1],1,false);
     addr_reg_val[1] |= 0x02;
     addr_reg_val[1] |= 0x04;
-    i2c_write_blocking(I2C_PORT, Address,addr_reg_val, 2, false);
+    i2c_write_blocking(I2C_PORT, I2C_ADDR_DS3231,addr_reg_val, 2, false);
 }
 bool Ds3231_check_alarm()
 {
     uint8_t regVal[2] = {DS3231_REG_STATUS,0x00};
     bool res = false;
-    i2c_write_blocking(I2C_PORT, Address,&regVal[0], 1, true);
-    i2c_read_blocking(I2C_PORT,Address, &regVal[1],1,false);
+    i2c_write_blocking(I2C_PORT, I2C_ADDR_DS3231,&regVal[0], 1, true);
+    i2c_read_blocking(I2C_PORT,I2C_ADDR_DS3231, &regVal[1],1,false);
     if(regVal[1] & DS3231_STA_A1F)
     {
         res = true;
         regVal[1] &= ~DS3231_STA_A1F;
-        i2c_write_blocking(I2C_PORT, Address,regVal, 2, false);
+        i2c_write_blocking(I2C_PORT, I2C_ADDR_DS3231,regVal, 2, false);
     }if(regVal[1] & DS3231_STA_A2F)
     {
         res = true;
         regVal[1] &= ~DS3231_STA_A2F;
-        i2c_write_blocking(I2C_PORT, Address,regVal, 2, false);
+        i2c_write_blocking(I2C_PORT, I2C_ADDR_DS3231,regVal, 2, false);
     }
     return res;
 }
@@ -237,8 +245,8 @@ void DS3231_REG_Read()
 {
     for (int i = 0; i < 16; i++)
     {
-        i2c_write_blocking(I2C_PORT, Address, &REG_ADDRESSES[i], 1, true);
-        i2c_read_blocking(I2C_PORT,Address, &DS3231_ReadReg[i],1,false);
+        i2c_write_blocking(I2C_PORT, I2C_ADDR_DS3231, &REG_ADDRESSES[i], 1, true);
+        i2c_read_blocking(I2C_PORT,I2C_ADDR_DS3231, &DS3231_ReadReg[i],1,false);
     }
 }
 void FormatTime_mode() {
@@ -265,17 +273,17 @@ void setClockMode(bool h12)
     if (h12)
     {
 
-        i2c_write_blocking(I2C_PORT, Address, &val[0], 1, true);
-        i2c_read_blocking(I2C_PORT, Address, &val[1], 1, false);
+        i2c_write_blocking(I2C_PORT, I2C_ADDR_DS3231, &val[0], 1, true);
+        i2c_read_blocking(I2C_PORT, I2C_ADDR_DS3231, &val[1], 1, false);
         val[1] = (val[1] | 0b01000000);
-        i2c_write_blocking(I2C_PORT,Address,val,2,false);
+        i2c_write_blocking(I2C_PORT,I2C_ADDR_DS3231,val,2,false);
     }
     else
     {
-        i2c_write_blocking(I2C_PORT, Address, &val[0], 1, true);
-        i2c_read_blocking(I2C_PORT, Address, &val[1], 1, false);
+        i2c_write_blocking(I2C_PORT, I2C_ADDR_DS3231, &val[0], 1, true);
+        i2c_read_blocking(I2C_PORT, I2C_ADDR_DS3231, &val[1], 1, false);
         val[1] = (val[1] & 0b10111111);
-        i2c_write_blocking(I2C_PORT,Address,val,2,false);
+        i2c_write_blocking(I2C_PORT,I2C_ADDR_DS3231,val,2,false);
     }
 }
 

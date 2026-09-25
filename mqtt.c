@@ -77,9 +77,9 @@ void mqtt_connection_cb(mqtt_client_t *client,
 
 static const char *adc_temp_config =
    "{"
-   "\"name\":\"ADC_Temp\","
+   "\"name\":\"Core Temperature\","
    "\"unique_id\":\"pico_clock_green_adc_temp\","
-   "\"state_topic\":\"home/pico/ADC_Temp\","
+   "\"state_topic\":\"home/pico/core_temperature\","
    "\"device_class\":\"voltage\","
    "\"state_class\":\"measurement\","
    "\"unit_of_measurement\":\"V\","
@@ -93,9 +93,9 @@ static const char *adc_temp_config =
 
 static const char *adc_light_config =
    "{"
-   "\"name\":\"ADC_Light\","
+   "\"name\":\"Ambient Light\","
    "\"unique_id\":\"pico_clock_green_adc_light\","
-   "\"state_topic\":\"home/pico/ADC_Light\","
+   "\"state_topic\":\"home/pico/ambient_light\","
    "\"device_class\":\"voltage\","
    "\"state_class\":\"measurement\","
    "\"unit_of_measurement\":\"V\","
@@ -107,21 +107,6 @@ static const char *adc_light_config =
    "}"
    "}";
 
-static const char *adc_vcc_config =
-   "{"
-   "\"name\":\"ADC_VCC\","
-   "\"unique_id\":\"pico_clock_green_adc_vcc\","
-   "\"state_topic\":\"home/pico/ADC_VCC\","
-   "\"device_class\":\"voltage\","
-   "\"state_class\":\"measurement\","
-   "\"unit_of_measurement\":\"V\","
-   "\"device\":{"
-   "\"identifiers\":[\"pico_clock_green\"],"
-   "\"name\":\"Pico Clock Green\","
-   "\"manufacturer\":\"Raspberry Pi\","
-   "\"model\":\"Pico W\""
-   "}"
-   "}";
 
 mqtt_publish(client,
    "homeassistant/sensor/pico_adc_temp/config",
@@ -133,10 +118,7 @@ mqtt_publish(client,
    adc_light_config, strlen(adc_light_config),
    1, 1, mqtt_publish_cb, NULL);
 
-mqtt_publish(client,
-   "homeassistant/sensor/pico_adc_vcc/config",
-   adc_vcc_config, strlen(adc_vcc_config),
-   1, 1, mqtt_publish_cb, NULL); 
+
 
    mqtt_up = 1;
 }
@@ -193,6 +175,15 @@ void mqtt_send(char *topic, char *payload) {
 void mqtt_send_float(char *topic, float payload) {
    char BUFFER[80];
    snprintf(BUFFER, 79, "%2.2f", payload);
+   printf("%s\n", BUFFER);
+   mqtt_send(topic, BUFFER);
+}
+
+
+void mqtt_send_int(char *topic, int payload) {
+   char BUFFER[80];
+   snprintf(BUFFER, 79, "%d", payload);
+   printf("%s\n", BUFFER);
    mqtt_send(topic, BUFFER);
 }
 

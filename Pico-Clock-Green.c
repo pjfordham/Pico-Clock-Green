@@ -37,8 +37,6 @@
 
 // GPIO mappings
 #define SET_FUNCTION 2
-#define SDA 6
-#define SCL 7
 #define UP 17
 #define DOWN 15
 #define SQW 3
@@ -139,10 +137,6 @@ static int port_init(void)
    gpio_set_dir(SQW, GPIO_IN);
    gpio_set_dir(BUZZ, GPIO_OUT);
 
-   gpio_set_function(SDA, GPIO_FUNC_I2C);
-   gpio_set_function(SCL, GPIO_FUNC_I2C);
-   gpio_pull_up(SDA);
-   gpio_pull_up(SCL);
 
    init_adc();
 
@@ -288,8 +282,11 @@ int main(void) {
 
    init_DS3231();
 
+   // DS3231 pinging every second
+   gpio_set_irq_enabled_with_callback(SQW, GPIO_IRQ_EDGE_FALL, true,
+                                      &gpio_callback);
 
-   gpio_set_irq_enabled_with_callback(SQW, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
+   // Buttons
    gpio_set_irq_enabled(SET_FUNCTION, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE,  true);
    gpio_set_irq_enabled(UP, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE,  true);
    gpio_set_irq_enabled(DOWN, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE,  true);
@@ -312,11 +309,10 @@ int main(void) {
    while (true) {
       absolute_time_t timeout_time = make_timeout_time_ms(50);
       if (time_reached(next_5s)) {
-         mqtt_send_float("home/pico/ADC_Temp", get_adc_voltage(ADC_Temp));
-         mqtt_send_float("home/pico/ADC_Light", get_adc_voltage(ADC_Light));
-         mqtt_send_float("home/pico/ADC_VCC", get_adc_voltage(ADC_VCC));
+         mqtt_send_float("home/pico/core_temperature", read_core_temperature());
+         mqtt_send_float("home/pico/ambient_light", (3.2 - get_adc_voltage(ADC_Light)) * (100.0/3.2) );
          display_print();
-          next_5s = delayed_by_ms(next_5s, 5000);
+         next_5s = delayed_by_ms(next_5s, 5000);
       }
 
       // We want to avoid racing RMW from irq handlers here so we disable them
