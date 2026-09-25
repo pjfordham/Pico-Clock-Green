@@ -32,14 +32,10 @@
 #include "PIO-Display.h"
 #include "adc.h"
 
-//-----define IO------------------------------
-
-// Output enable for shaft registers
+// Output enable for shift registers
 #define	OE	13
-#define	OE_OPEN		gpio_put(OE, 0)
-#define	OE_CLOSE	gpio_put(OE, 1)
 
-//定义按键
+// GPIO mappings
 #define SET_FUNCTION 2
 #define SDA 6
 #define SCL 7
@@ -48,13 +44,8 @@
 #define SQW 3
 #define BUZZ 14
 
-
-
-#define UP_flag 1
-#define DOWN_flag 0
-
-//------------定义左侧状态指示灯使用的个数---------
-#define	disp_offset		2
+// Specify the number of status indicators used on the left side.
+#define	disp_offset 2
 
 enum {
   MOVE_ON = 0,
@@ -297,7 +288,7 @@ int main(void) {
 
    init_DS3231();
 
- 
+
    gpio_set_irq_enabled_with_callback(SQW, GPIO_IRQ_EDGE_FALL, true, &gpio_callback);
    gpio_set_irq_enabled(SET_FUNCTION, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE,  true);
    gpio_set_irq_enabled(UP, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE,  true);
@@ -309,7 +300,7 @@ int main(void) {
    Set_alarm1_clock( ALARM_MODE_SEC_MATCHED, 0,0,0,0 );
 
    run_adc();
-   
+
    clock_mode = MODE_DISPLAY_TIME;
 
    Alarm_RTC.dayofweek = 3;

@@ -1,3 +1,6 @@
+#ifndef ADC_H
+#define ADC_H
+
 #define ADC0 26
 #define ADC1 27
 #define ADC2 28
@@ -16,3 +19,5 @@ void adc_interrupt_handler();
 
 void init_adc();
 void run_adc();
+
+#endif
