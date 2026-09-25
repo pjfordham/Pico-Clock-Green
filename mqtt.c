@@ -25,6 +25,7 @@ typedef struct {
 
 mqtt_client_t *client = NULL;
 int mqtt_up = 0;
+int brightness = 255;
 
 bool mqtt_buffer_get(MqttMessage *message);
 void mqtt_buffer_init(void);
@@ -54,6 +55,23 @@ void mqtt_init() {
 }
 
 
+static void mqtt_incoming_publish_cb(void *arg,
+                                     const char *topic,
+                                     u32_t tot_len)
+{
+    printf("Incoming topic: %s\n", topic);
+}
+
+static void mqtt_incoming_data_cb(void *arg,
+                                  const u8_t *data,
+                                  u16_t len,
+                                  u8_t flags)
+{
+   brightness = strtol(data, NULL ,10);
+  printf("Incoming payload: %.*s %d\n", len, data, brightness);
+  
+}
+
 void    mqtt_publish_cb(void *arg, err_t err)
 {
    if (err == ERR_OK) {
@@ -62,6 +80,19 @@ void    mqtt_publish_cb(void *arg, err_t err)
       printf("MQTT publish failed: %d\n", err);
    }
 }
+
+static void mqtt_subscribe_cb(void *arg,
+                              err_t err)
+{
+    if (err == ERR_OK) {
+        printf("Subscribed to brightness\n");
+    } else {
+        printf("Brightness subscribe failed: %d\n", err);
+    }
+
+    mqtt_set_inpub_callback(client, mqtt_incoming_publish_cb,
+                            mqtt_incoming_data_cb, NULL);
+    }
 
 void mqtt_connection_cb(mqtt_client_t *client,
                         void *arg,
@@ -105,6 +136,24 @@ static const char *adc_light_config =
    "}"
    "}";
 
+static const char *brightness_config =
+    "{"
+    "\"name\":\"Display Brightness\","
+    "\"unique_id\":\"pico_clock_green_display_brightness\","
+    "\"command_topic\":\"home/pico/display_brightness/set\","
+    "\"state_topic\":\"home/pico/display_brightness/state\","
+    "\"min\":0,"
+    "\"max\":255,"
+    "\"step\":1,"
+    "\"unit_of_measurement\":\"%\","
+    "\"device\":{"
+    "\"identifiers\":[\"pico_clock_green\"],"
+    "\"name\":\"Pico Clock Green\","
+    "\"manufacturer\":\"Raspberry Pi\","
+    "\"model\":\"Pico W\""
+    "}"
+    "}";
+
 mqtt_publish(client,
    "homeassistant/sensor/pico_adc_temp/config",
    adc_temp_config, strlen(adc_temp_config),
@@ -115,8 +164,17 @@ mqtt_publish(client,
    adc_light_config, strlen(adc_light_config),
    1, 1, mqtt_publish_cb, NULL);
 
+mqtt_publish(client,
+   "homeassistant/number/pico_display_brightness/config",
+             brightness_config, strlen(brightness_config),
+   1, 1, mqtt_publish_cb, NULL);
 
 
+mqtt_subscribe(client,
+               "home/pico/display_brightness/set",
+               0,
+               mqtt_subscribe_cb,
+               NULL);
    mqtt_up = 1;
 }
 

@@ -147,7 +147,7 @@ static int port_init(void)
    pwm_set_clkdiv(slice_num, clkdiv);
    pwm_set_enabled(slice_num, false); // Stop the PWM
    pwm_set_wrap(slice_num, 256);
-   pwm_set_gpio_level(OE, 200); // 255 - 0 => Off - On
+   pwm_set_gpio_level(OE, 0); // 255 - 0 => Off - On
    pwm_set_enabled(slice_num, true);
 
    // gpio_set_function(BUZZ, GPIO_FUNC_PWM);
@@ -266,6 +266,16 @@ void core0_sio_irq() {
    multicore_fifo_clear_irq();
 }
 
+void set_display_brightness(int b)
+{
+  static int x = -1;
+  if (x != b) {
+     pwm_set_gpio_level(OE, 255 - b); // 255 - 0 => Off - On
+     mqtt_send_int("home/pico/display_brightness/state", b );
+     x = b;
+  }
+}
+
 TIME_RTC Time_RTC, Alarm_RTC;
 static void show_adc(int channel);
 
@@ -364,10 +374,10 @@ int main(void) {
       if (clock_mode == MODE_DISPLAY_TIME) {
          if (c & UPDATE_TIME || c & SHORT_CLICK_A)
             display_time();
-         if (c & LONG_CLICK_B) {
+         if (c & LONG_CLICK_C) {
             display(AUTO_LIGHT);
          }
-         if (c & SHORT_CLICK_B) {
+         if (c & SHORT_CLICK_C) {
             clear(AUTO_LIGHT);
           }
       }
@@ -385,11 +395,11 @@ int main(void) {
       if (c & SHUTDOWN) {
          break;
       }
+      set_display_brightness( brightness );
       best_effort_wfe_or_timeout(timeout_time);
    }
    return 0;
 }
-
 
 
 static void show_adc(int channel) {
