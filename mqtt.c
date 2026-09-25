@@ -74,15 +74,14 @@ void mqtt_connection_cb(mqtt_client_t *client,
 
    printf("MQTT connected\n");
 
-
 static const char *adc_temp_config =
    "{"
    "\"name\":\"Core Temperature\","
    "\"unique_id\":\"pico_clock_green_adc_temp\","
    "\"state_topic\":\"home/pico/core_temperature\","
-   "\"device_class\":\"voltage\","
+   "\"device_class\":\"temperature\","
    "\"state_class\":\"measurement\","
-   "\"unit_of_measurement\":\"V\","
+   "\"unit_of_measurement\":\"°C\","
    "\"device\":{"
    "\"identifiers\":[\"pico_clock_green\"],"
    "\"name\":\"Pico Clock Green\","
@@ -96,9 +95,8 @@ static const char *adc_light_config =
    "\"name\":\"Ambient Light\","
    "\"unique_id\":\"pico_clock_green_adc_light\","
    "\"state_topic\":\"home/pico/ambient_light\","
-   "\"device_class\":\"voltage\","
    "\"state_class\":\"measurement\","
-   "\"unit_of_measurement\":\"V\","
+   "\"unit_of_measurement\":\"%\","
    "\"device\":{"
    "\"identifiers\":[\"pico_clock_green\"],"
    "\"name\":\"Pico Clock Green\","
@@ -106,7 +104,6 @@ static const char *adc_light_config =
    "\"model\":\"Pico W\""
    "}"
    "}";
-
 
 mqtt_publish(client,
    "homeassistant/sensor/pico_adc_temp/config",
