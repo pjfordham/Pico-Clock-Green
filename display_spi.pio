@@ -1,23 +1,43 @@
 .program display_data
 .side_set 1 optional
 
-; State Machine 0: Shifts 32 data bits sequentially, then signals the Row Muxer
 .wrap_target
-    set x, 31               ; Loop counter for 32 bits
+    set x, 31
 bit_loop:
-    out pins, 1      side 0 ; Shift 1 data bit to SDI, drive CLK low
-    jmp x-- bit_loop side 1 ; Drive CLK high, loop 32 times
-    irq wait 0              ; Set IRQ 0 and stall until SM1 clears it
+    out pins, 1      side 0
+    jmp x-- bit_loop side 1
+    irq wait 0              ; Signal SM1 and stall here
 .wrap
 
 
 .program display_mux
 .side_set 1
-
-; State Machine 1: Grabs explicit raw bit configurations to step exactly A0, A1, A2
 .wrap_target
-    wait 1 irq 0 side 0     ; Wait for SM0 to finish shifting a frame
-    pull block   side 0
-    out pins, 7  side 1     ; Pull 3 bits from its own FIFO queue and dump them directly to A0, A1, A2
-    irq clear 0  side 0     ; Release SM0 to continue
+    pull block   side 0     ; 1. Pre-load data from FIFO (stalls here if empty)
+    wait 1 irq 0 side 0     ; 2. Wait for SM0 to finish shifting
+
+    irq 1        side 0     ; 3. Master Trigger: Instantly unblocks display_mux_2
+
+    ; === PERFECT LOCK-STEP CYCLE ===
+    out pins, 5  side 1     ; 4. Fires simultaneously with SM2! A1-A2
+
+    irq clear 0  side 0     ; 5. Release SM0 to continue shifting
+.wrap
+
+
+.program display_mux_2
+.side_set 1
+.wrap_target
+     wait 1 irq 1 side 1    ; 2. Wait for SM1 to give the synchronized "GO"
+
+    ; === PERFECT LOCK-STEP CYCLE ===
+    nop side 0
+
+    irq clear 1 side 0     ; 4. Clean up the sync flag for the next cycle
+     wait 1 irq 1 side 0    ; 2. Wait for SM1 to give the synchronized "GO"
+
+    ; === PERFECT LOCK-STEP CYCLE ===
+    nop side 1
+
+    irq clear 1   side 1   ; 4. Clean up the sync flag for the next cycle
 .wrap

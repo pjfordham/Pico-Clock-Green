@@ -374,10 +374,10 @@ int main(void) {
       if (clock_mode == MODE_DISPLAY_TIME) {
          if (c & UPDATE_TIME || c & SHORT_CLICK_A)
             display_time();
-         if (c & LONG_CLICK_C) {
+         if (c & LONG_CLICK_B) {
             display(AUTO_LIGHT);
          }
-         if (c & SHORT_CLICK_C) {
+         if (c & SHORT_CLICK_B) {
             clear(AUTO_LIGHT);
           }
       }
