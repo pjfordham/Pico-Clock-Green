@@ -7,17 +7,7 @@
 
 #define NUM_ROWS 8
 uint32_t display_buffer[8] __attribute__((aligned(32)));
-// Replace the old row_mux_values declaration at the top of PIO-Display.c:
-static uint32_t row_mux_values[NUM_ROWS] __attribute__((aligned(32))) = {
-   0x00, // Row 0 (Binary 000) -> Pins: 22=0, 18=0, 16=0 (Hex 0x00)
-   0x00, // Row 1 (Binary 001) -> Pins: 22=0, 18=0, 16=1 (Hex 0x01)
-   0x01, // Row 2 (Binary 010) -> Pins: 22=0, 18=1, 16=0 (Hex 0x04)
-   0x01, // Row 3 (Binary 011) -> Pins: 22=0, 18=1, 16=1 (Hex 0x05)
-   0x10, // Row 4 (Binary 100) -> Pins: 22=1, 18=0, 16=0 (Hex 0x40)
-   0x10, // Row 5 (Binary 101) -> Pins: 22=1, 18=0, 16=1 (Hex 0x41)
-   0x11, // Row 6 (Binary 110) -> Pins: 22=1, 18=1, 16=0 (Hex 0x44)
-   0x11  // Row 7 (Binary 111) -> Pins: 22=1, 18=1, 16=1 (Hex 0x45)
-};
+
 
 #define SDI  11
 #define CLK  10
@@ -71,12 +61,6 @@ int display_init() {
    pio_gpio_init(display_pio, A1); // 18
    pio_gpio_init(display_pio, A2); // 22
 
-   // Explicitly configure intermediate pins as well to guarantee continuity
-   pio_gpio_init(display_pio, 17);
-   pio_gpio_init(display_pio, 19);
-   pio_gpio_init(display_pio, 20);
-   pio_gpio_init(display_pio, 21);
-
    sm_config_set_out_shift(&c_data, true, true, 32);
    sm_config_set_clkdiv(&c_data, 80.0f);
    pio_sm_init(display_pio, sm_data, offset_data, &c_data);
@@ -86,12 +70,12 @@ int display_init() {
    pio_sm_config c_mux = display_mux_program_get_default_config(offset_mux);
 
    // Setup A0 as the base OUT pin for SM1
-   sm_config_set_out_pins(&c_mux, A1, 5);
+   sm_config_set_set_pins(&c_mux, A2, 1);
    sm_config_set_out_shift(&c_mux, true, false, 32); // Autopull 3 bits at a time
    sm_config_set_sideset_pins(&c_mux, LE);
    sm_config_set_clkdiv(&c_mux, 80.0f);
    pio_sm_init(display_pio, sm_mux, offset_mux, &c_mux);
-   pio_sm_set_consecutive_pindirs(display_pio, sm_mux, A1, 5, true);
+   pio_sm_set_consecutive_pindirs(display_pio, sm_mux, A2, 1, true);
    pio_sm_set_pindirs_with_mask(display_pio, sm_mux2, 1u << LE, 1u << LE); 
 
    // 2. Initialize hardware addresses for the Row Muxer (SM1)
@@ -100,9 +84,11 @@ int display_init() {
 
    // Setup A0 as the base OUT pin for SM1
    sm_config_set_sideset_pins(&c_mux2, A0);
+   sm_config_set_set_pins(&c_mux2, A1, 1);
    //sm_config_set_sideset(&c_mux2, 1, false, false);
    sm_config_set_clkdiv(&c_mux2, 80.0f);
    pio_sm_init(display_pio, sm_mux2, offset_mux2, &c_mux2);
+   pio_sm_set_consecutive_pindirs(display_pio, sm_mux, A1, 1, true);
    pio_sm_set_pindirs_with_mask(display_pio, sm_mux2, 1u << A0, 1u << A0); 
 
    // Override the pin mappings for SM1 so it specifically jumps over the hardware gaps!
@@ -135,37 +121,7 @@ int display_init() {
       false                          // Fire immediately!
       );
 
-   // 4. Setup background MUX DMA Channel (Streams row changes in lockstep to SM1)
-   mux_dma_chan = dma_claim_unused_channel(true);
-   dma_channel_config mux_config = dma_channel_get_default_config(mux_dma_chan);
-   channel_config_set_transfer_data_size(&mux_config, DMA_SIZE_32);
-   channel_config_set_read_increment(&mux_config, true);
-   channel_config_set_write_increment(&mux_config, false);
-   channel_config_set_dreq(&mux_config, pio_get_dreq(display_pio, sm_mux, true));
-   channel_config_set_ring(&mux_config, false, 5);
-
-   dma_channel_configure(
-      mux_dma_chan,
-      &mux_config,
-      &display_pio->txf[sm_mux], // Target: PIO FIFO
-      row_mux_values,               // Source: Your memory-aligned array
-      0xFFFFFFFF,                   // Transfer essentially forever
-      false                          // Fire immediately!
-      );
-   // // Fire pipelines!
-   // dma_channel_configure(data_dma_chan, &data_config, &display_pio->txf[sm_data], display_buffer, NUM_ROWS, true);
-   // dma_channel_configure(mux_dma_chan, &mux_config, &display_pio->txf[sm_mux], row_mux_values, NUM_ROWS, true);
-
-   // // Enable state machines
-   // pio_sm_set_enabled(display_pio, sm_mux, true);
-   // pio_sm_set_enabled(display_pio, sm_data, true);
-
-
-   // 1. First, set up your DMA channel configurations completely,
-   // BUT set the final parameter to 'false' so they don't fire yet!
-//    dma_channel_configure(data_dma_chan, &data_config, &display_pio->txf[sm_data], display_buffer, NUM_ROWS, false);
-   //   dma_channel_configure(mux_dma_chan, &mux_config, &display_pio->txf[sm_mux], row_mux_values, NUM_ROWS, false);
-
+ 
    // 2. Clear out any junk or random states currently blocking the PIO FIFOs
    pio_sm_clear_fifos(display_pio, sm_data);
    pio_sm_clear_fifos(display_pio, sm_mux);
@@ -178,7 +134,6 @@ int display_init() {
    // 4. Now that the PIO is awake and actively screaming for data (asserting DREQ),
    // manually trigger the DMA pipelines to start streaming!
    dma_channel_start(data_dma_chan);
-   dma_channel_start(mux_dma_chan);
 
    return offset_data << 16 | offset_mux;
 }
