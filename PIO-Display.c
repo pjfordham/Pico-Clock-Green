@@ -60,7 +60,7 @@ int display_init() {
    pio_gpio_init(display_pio, A1); // 18
    pio_gpio_init(display_pio, A2); // 22
 
-   sm_config_set_out_shift(&c_data, true, true, 32);
+   sm_config_set_out_shift(&c_data, true, false, 32);
    sm_config_set_clkdiv(&c_data, 80.0f);
    pio_sm_init(display_pio, sm_data, offset_data, &c_data);
 
