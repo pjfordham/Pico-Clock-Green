@@ -6,32 +6,31 @@
 bit_loop:
     out pins, 1      side 0
     jmp x-- bit_loop side 1
-    irq wait 0              ; Signal SM1 and stall here
+    irq wait 0    [1]          ; Signal SM1 and stall here
 .wrap
 
-
+; A0-A2 should counter over the rows and LE should be pushed hi on each chaneg to latch in the new row data
 .program display_mux
 .side_set 1
 .wrap_target
-    set x, 3      side 0      ; Initialize loop counter (3 means execute 4 times)
+    set x, 3      side 0    ; Initialize loop counter (3 means execute 4 times)
 loop_a2_off:
     wait 1 irq 0 side 0     ; 2. Wait for SM0 to finish shifting
 
-    irq 1        side 0     ; 3. Master Trigger: Instantly unblocks display_mux_2
-
+    irq 1        side 0 [1]     ; 3. Master Trigger: Instantly unblocks display_mux_2
     ; === PERFECT LOCK-STEP CYCLE ===
-    set pins, 0  side 1     ; 4. Fires simultaneously with SM2! A1-A2
+    set pins, 0  side 1     ; 4. Fires simultaneously with SM2! Set A2 MSB of MUX to 0, side sets LE to latch data into shift register
 
     irq clear 0  side 0     ; 5. Release SM0 to continue shifting
   jmp x-- loop_a2_off side 0
-    set x, 3    side 0         ; Initialize loop counter (3 means execute 4 times)
+    set x, 3    side 0      ; Initialize loop counter (3 means execute 4 times)
 loop_a2_on:
     wait 1 irq 0 side 0     ; 2. Wait for SM0 to finish shifting
 
-    irq 1        side 0     ; 3. Master Trigger: Instantly unblocks display_mux_2
-
+    irq 1        side 0 [1]     ; 3. Master Trigger: Instantly unblocks display_mux_2
+ 
     ; === PERFECT LOCK-STEP CYCLE ===
-    set pins, 1  side 1     ; 4. Fires simultaneously with SM2! A1-A2
+    set pins, 1  side 1     ; 4. Fires simultaneously with SM2! Set A2 MSB of MUX to 1, side sets LE to latch data into shift register
 
     irq clear 0  side 0     ; 5. Release SM0 to continue shifting
   jmp x-- loop_a2_on side 0
@@ -45,25 +44,25 @@ loop_a2_on:
      wait 1 irq 1 side 1    ; 2. Wait for SM1 to give the synchronized "GO"
 
     ; === PERFECT LOCK-STEP CYCLE ===
-    set pins 0 side 0
+    set pins 0 side 0       ; set A1 to 0 and side set A0 to 0
 
     irq clear 1 side 0     ; 4. Clean up the sync flag for the next cycle
      wait 1 irq 1 side 0    ; 2. Wait for SM1 to give the synchronized "GO"
 
     ; === PERFECT LOCK-STEP CYCLE ===
-    nop side 1
+    set pins 0 side 1 ; leave A1 at 0 and side set A0 to 0
 
     irq clear 1   side 1   ; 4. Clean up the sync flag for the next cycle
      wait 1 irq 1 side 1    ; 2. Wait for SM1 to give the synchronized "GO"
 
     ; === PERFECT LOCK-STEP CYCLE ===
-    set pins 1 side 0
+    set pins 1 side 0  ; set A1 to 1 and side set A0 to 0
 
     irq clear 1 side 0     ; 4. Clean up the sync flag for the next cycle
      wait 1 irq 1 side 0    ; 2. Wait for SM1 to give the synchronized "GO"
 
     ; === PERFECT LOCK-STEP CYCLE ===
-    nop side 1
+    set pins 1 side 1 ; leave A1 at 1 and side set A0 to 1
 
     irq clear 1   side 1   ; 4. Clean up the sync flag for the next cycle
 .wrap
