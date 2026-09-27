@@ -1,68 +1,79 @@
 .program display_data
-.side_set 1 optional
+.side_set 1                 ; 1 Side-set pin mapped strictly to CLK (Clock)
 
 .wrap_target
-    set x, 31
-bit_loop:
-    out pins, 1      side 0
-    jmp x-- bit_loop side 1
-    irq wait 0    [1]          ; Signal SM1 and stall here
+    ; =========================================================================
+    ; PHASE 1: FILL SHIFT REGISTER WITH ZEROES & LATCH IT IN
+    ; =========================================================================
+    mov osr, null    side 0       ; Populate the OSR with 32 bits of absolute zero
+    set x, 31        side 0       ; Loop counter for 32 clearing clocks
+
+clear_loop:
+    out pins, 1      side 0 ; Output a zero bit, pull CLK low
+    jmp x-- clear_loop side 1 ; Pulse CLK high, loop 32 times
+
+    ; Clock lines are now parked. Trigger the dummy latch to blank the display lines.
+    set pins, 1      side 0 ; Pulse LE (Latch Enable) HIGH to lock in the zeroes
+    set pins, 0      side 0 ; Pull LE back LOW
+
+    ; =========================================================================
+    ; PHASE 2: HANDSHAKE TO THE ADDRESS SETTING SMs
+    ; =========================================================================
+    irq wait 0       side 0 ; Signal SM1 (display_mux) to safely change row addresses
+                            ; while the panel is outputting blank data.
+
+    ; =========================================================================
+    ; PHASE 3: WRITE OUT THE TRUE PIXEL DATA & LATCH IT IN
+    ; =========================================================================
+    ; (The state machine unblocks here once SM1 clears IRQ 0)
+    set x, 31        side 0       ; Reset loop counter for the 32 real pixel bits
+
+true_data_loop:
+    out pins, 1      side 0 ; Pull the true pixel data from DMA, pull CLK low
+    jmp x-- true_data_loop side 1 ; Pulse CLK high, loop 32 times
+
+    ; True row data is now loaded. Strike the real latch to project it onto the screen.
+    set pins, 1      side 0 ; Pulse LE (Latch Enable) HIGH to lock in the true frame row
+    set pins, 0      side 0 ; Pull LE back LOW
+
+    ; =========================================================================
+    ; PHASE 4: PAUSE FOR DISPLAY PERIOD AND LOOP
+    ; =========================================================================
+    ; Adjust these delay blocks to set your row illumination duty cycle.
+    set x, 31        side 0       ; Reset loop counter for the 32 real pixel bits
+delay_loop:
+    nop [4]         side 0 ; Hold for 32 clock cycles
+    nop side 0
+    nop side 0
+    nop side 0
+    nop side 0
+    nop side 0
+    jmp x-- delay_loop side 0 ; Pulse CLK high, loop 32 times
 .wrap
 
 ; A0-A2 should counter over the rows and LE should be pushed hi on each chaneg to latch in the new row data
+;  sm_config_set_out_pins(&c_mux, A2, 1);
+;  sm_config_set_set_pins(&c_mux, A1, 1);
+;  sm_config_set_sideset_pins(&c_mux, A0);
+
 .program display_mux
 .side_set 1
 .wrap_target
-    set x, 3      side 0    ; Initialize loop counter (3 means execute 4 times)
-loop_a2_off:
-    wait 1 irq 0 side 0     ; 2. Wait for SM0 to finish shifting
 
-    irq 1        side 0 [1]     ; 3. Master Trigger: Instantly unblocks display_mux_2
-    ; === PERFECT LOCK-STEP CYCLE ===
-    set pins, 0  side 1     ; 4. Fires simultaneously with SM2! Set A2 MSB of MUX to 0, side sets LE to latch data into shift register
+    wait 1 irq 0 side 1    ; 2. Wait for SM0 to finish shifting
+    set pins 0 side 0
+    mov osr, null side 0
+    out pins 1 side 0
+    irq clear 0 side 0
 
-    irq clear 0  side 0     ; 5. Release SM0 to continue shifting
-  jmp x-- loop_a2_off side 0
-    set x, 3    side 0      ; Initialize loop counter (3 means execute 4 times)
-loop_a2_on:
-    wait 1 irq 0 side 0     ; 2. Wait for SM0 to finish shifting
+    wait 1 irq 0 side 0    ; 2. Wait for SM0 to finish shifting
+    irq clear 0 side 1
 
-    irq 1        side 0 [1]     ; 3. Master Trigger: Instantly unblocks display_mux_2
- 
-    ; === PERFECT LOCK-STEP CYCLE ===
-    set pins, 1  side 1     ; 4. Fires simultaneously with SM2! Set A2 MSB of MUX to 1, side sets LE to latch data into shift register
+    wait 1 irq 0 side 0    ; 2. Wait for SM0 to finish shifting
+    set pins 1 side 0
+    irq clear 0 side 0
 
-    irq clear 0  side 0     ; 5. Release SM0 to continue shifting
-  jmp x-- loop_a2_on side 0
+    wait 1 irq 0 side 0    ; 2. Wait for SM0 to finish shifting
+    irq clear 0 side 1
 
-.wrap
-
-
-.program display_mux_2
-.side_set 1
-.wrap_target
-     wait 1 irq 1 side 1    ; 2. Wait for SM1 to give the synchronized "GO"
-
-    ; === PERFECT LOCK-STEP CYCLE ===
-    set pins 0 side 0       ; set A1 to 0 and side set A0 to 0
-
-    irq clear 1 side 0     ; 4. Clean up the sync flag for the next cycle
-     wait 1 irq 1 side 0    ; 2. Wait for SM1 to give the synchronized "GO"
-
-    ; === PERFECT LOCK-STEP CYCLE ===
-    set pins 0 side 1 ; leave A1 at 0 and side set A0 to 0
-
-    irq clear 1   side 1   ; 4. Clean up the sync flag for the next cycle
-     wait 1 irq 1 side 1    ; 2. Wait for SM1 to give the synchronized "GO"
-
-    ; === PERFECT LOCK-STEP CYCLE ===
-    set pins 1 side 0  ; set A1 to 1 and side set A0 to 0
-
-    irq clear 1 side 0     ; 4. Clean up the sync flag for the next cycle
-     wait 1 irq 1 side 0    ; 2. Wait for SM1 to give the synchronized "GO"
-
-    ; === PERFECT LOCK-STEP CYCLE ===
-    set pins 1 side 1 ; leave A1 at 1 and side set A0 to 1
-
-    irq clear 1   side 1   ; 4. Clean up the sync flag for the next cycle
 .wrap
