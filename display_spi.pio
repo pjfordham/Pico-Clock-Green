@@ -1,33 +1,36 @@
 .program display_data
-.side_set 1                 ; 1 Side-set pin mapped strictly to CLK (Clock)
+.side_set 1                 ; Side-set pin mapped strictly to CLK (Clock)
 .wrap_target
-    mov osr, null    side 0       ; 1. Clear OSR for the blanking phase
-    set y, 1        side 0        ; 2. Y=1 means Blanking Phase, Y=0 means Data Phase
+    mov osr, null       side 0    ; 1. Clear OSR for the blanking phase
+    set y, 1            side 0    ; 2. Y=1 means Blanking Phase, Y=0 means Data Phase
 
 mode_loop:
-    set x, 31     side 0        ; 3. Loop counter for 32 clock cycles
+    set x, 31           side 0    ; 3. Loop counter for 32 clock cycles
 bit_loop:
-    out pins, 1   side 0 ; 4. Shift out 1 bit (either zero or real pixel data)
-    jmp x-- bit_loop side 1 ; 5. Pulse CLK high, repeat 32 times
+    out pins, 1         side 0    ; 4. Shift out 1 bit (either zero or real pixel data)
+    jmp x-- bit_loop    side 1    ; 5. Pulse CLK high, repeat 32 times
 
-    set pins, 1   side 0 ; 6. Pulse LE HIGH
-    set pins, 0   side 0 ; 7. Pull LE LOW
+    set pins, 1         side 0    ; 6. Pulse LE HIGH
+    set pins, 0         side 0    ; 7. Pull LE LOW
 
-    ; --- Branching Control Matrix ---
     jmp !y, delay_path  side 0    ; 8. If Y==0 (Data Phase done), jump to the frame delay
     irq wait 0          side 0    ; 9. If Y==1 (Blank Phase done), signal SM1 to shift rows
-    pull block         side 0     ; 10. Grab fresh pixel data from DMA (overwrites the null OSR)
+    pull block          side 0    ; 10. Grab fresh pixel data from DMA (overwrites the null OSR)
     jmp y-- mode_loop   side 0    ; 11. Decrement Y to 0 and loop back to shift the real data
 
 delay_path:
-    set x, 31       side 0        ; 12. Load pause counter
-delay_loop:
-    jmp x-- delay_loop side 0 ; 13. Burn clock cycles before wrapping
+    set x, 31           side 0    ; 12. Load pause counter
+delay:
+    jmp x-- delay [15]  side 0    ; 13. Burn clock cycles before wrapping
 .wrap
 
 
 
-; A0-A2 should counter over the rows and LE should be pushed hi on each chaneg to latch in the new row data
+; A0-A2 should just behave as a 3-bit binary counter advancing one
+; everything it is release from waits by display_data
+; Pins A0-A3 are not contigous GPIOs so we can't write them all
+; with a single instruction.
+;
 ;  sm_config_set_out_pins(&c_mux, A2, 1);
 ;  sm_config_set_set_pins(&c_mux, A1, 1);
 ;  sm_config_set_sideset_pins(&c_mux, A0);
