@@ -36,28 +36,24 @@ delay_loop:
 .side_set 1
 .wrap_target
 
+    set y, 1     side 1
+
+A2:
+    set x, 1     side 1
+A1:
+    wait 1 irq 0 side 1
+    set pins 1   side 0
+    jmp !x done  side 0
+    set pins 0   side 0
 done:
+    mov pins ~y  side 0
+    irq clear 0  side 0
 
-    set y, 1        side 1
+    wait 1 irq 0 side 0
+    irq clear 0  side 1
 
-low_bits:
-    mov osr, ~y side 1
-    wait 1 irq 0 side 1    ; 2. Wait for SM0 to finish shifting
-    set pins 0 side 0
-    out pins 1 side 0
-    irq clear 0 side 0
+    jmp x-- A1   side 0
 
-    wait 1 irq 0 side 0    ; 2. Wait for SM0 to finish shifting
-    irq clear 0 side 1
-
-    wait 1 irq 0 side 1    ; 2. Wait for SM0 to finish shifting
-    set pins 1 side 0
-    irq clear 0 side 0
-
-    wait 1 irq 0 side 0    ; 2. Wait for SM0 to finish shifting
-    irq clear 0 side 1
-
-    jmp y-- low_bits side 1
-
+    jmp y-- A2   side 1
 
 .wrap
