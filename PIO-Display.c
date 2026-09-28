@@ -71,12 +71,13 @@ void display_init() {
 
    pio_sm_init(display_pio, sm_mux, offset_mux, &c_mux);
 
-   // Setup DATA DMA Channel display_data program
-   data_dma_chan = dma_claim_unused_channel(true);
+   // Claim DMA channels
    static const uint32_t dma_size = 0xFFFFFFFF;
+   data_dma_chan = dma_claim_unused_channel(true);
    ctrl_dma_chan = dma_claim_unused_channel(true);
-   dma_channel_config data_config = dma_channel_get_default_config(data_dma_chan);
 
+   // Setup DATA DMA Channel display_data program
+   dma_channel_config data_config = dma_channel_get_default_config(data_dma_chan);
    channel_config_set_transfer_data_size(&data_config, DMA_SIZE_32);
    channel_config_set_read_increment(&data_config, true);
    channel_config_set_write_increment(&data_config, false);
