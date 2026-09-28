@@ -47,7 +47,7 @@ void display_init() {
    sm_config_set_sideset_pins(&c_data, CLK);
    sm_config_set_set_pins(&c_data, LE, 1);
    sm_config_set_out_shift(&c_data, true, false, 32);
-   sm_config_set_clkdiv(&c_data, 80.0f);
+   sm_config_set_clkdiv(&c_data, 40.0f);
 
    pio_sm_init(display_pio, sm_data, offset_data, &c_data);
 
@@ -67,7 +67,7 @@ void display_init() {
    sm_config_set_out_pins(&c_mux, A2, 1);
    sm_config_set_set_pins(&c_mux, A1, 1);
    sm_config_set_sideset_pins(&c_mux, A0);
-   sm_config_set_clkdiv(&c_mux, 80.0f);
+   sm_config_set_clkdiv(&c_mux, 40.0f);
 
    pio_sm_init(display_pio, sm_mux, offset_mux, &c_mux);
 
