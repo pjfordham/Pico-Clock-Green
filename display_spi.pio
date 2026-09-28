@@ -1,35 +1,31 @@
 .program display_data
 .side_set 1                 ; 1 Side-set pin mapped strictly to CLK (Clock)
-
 .wrap_target
+    mov osr, null    side 0       ; 1. Clear OSR for the blanking phase
+    set y, 1        side 0        ; 2. Y=1 means Blanking Phase, Y=0 means Data Phase
 
-    mov osr, null    side 0 ; Populate OSR with absolute zero
-    set x, 31        side 0 ; Loop counter for 32 clock cycles
-blank_loop:
-    out pins, 1      side 0 ; Pulls a zero bit from OSR to the data pin
-    jmp x-- blank_loop side 1 ; Pulse CLK high, repeat 32 times
+mode_loop:
+    set x, 31     side 0        ; 3. Loop counter for 32 clock cycles
+bit_loop:
+    out pins, 1   side 0 ; 4. Shift out 1 bit (either zero or real pixel data)
+    jmp x-- bit_loop side 1 ; 5. Pulse CLK high, repeat 32 times
 
-    set pins, 1      side 0 ; Pulse LE HIGH to lock in the blank output
-    set pins, 0      side 0 ; Pull LE LOW
+    set pins, 1   side 0 ; 6. Pulse LE HIGH
+    set pins, 0   side 0 ; 7. Pull LE LOW
 
-    irq wait 0       side 0 ; Signal SM1 to switch rows while panel is dark
+    ; --- Branching Control Matrix ---
+    jmp !y, delay_path  side 0    ; 8. If Y==0 (Data Phase done), jump to the frame delay
+    irq wait 0          side 0    ; 9. If Y==1 (Blank Phase done), signal SM1 to shift rows
+    pull block         side 0     ; 10. Grab fresh pixel data from DMA (overwrites the null OSR)
+    jmp y-- mode_loop   side 0    ; 11. Decrement Y to 0 and loop back to shift the real data
 
-
-    pull block       side 0 ; Wait for and grab fresh DMA data manually
-    set x, 31        side 0 ; Loop counter for 32 clock cycles
-data_loop:
-    out pins, 1       side 0 ; Pulls a true pixel bit from DMA to the data pin
-    jmp x-- data_loop side 1 ; Pulse CLK high, repeat 32 times
-
-    set pins, 1      side 0 ; Pulse LE HIGH to lock in the data output
-    set pins, 0      side 0 ; Pull LE LOW
-
-
-    set x, 31        side 0 ; Load pause counter
+delay_path:
+    set x, 31       side 0        ; 12. Load pause counter
 delay_loop:
-    jmp x-- delay_loop [15] side 0
-    
+    jmp x-- delay_loop side 0 ; 13. Burn clock cycles before wrapping
 .wrap
+
+
 
 ; A0-A2 should counter over the rows and LE should be pushed hi on each chaneg to latch in the new row data
 ;  sm_config_set_out_pins(&c_mux, A2, 1);
