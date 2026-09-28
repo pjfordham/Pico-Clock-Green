@@ -45,6 +45,8 @@
 // Specify the number of status indicators used on the left side.
 #define	disp_offset 2
 
+uint32_t *display_buffer;
+
 enum {
   MOVE_ON = 0,
   ALARM_ON,
@@ -281,7 +283,8 @@ static void show_adc(int channel);
 
 int main(void) {
    port_init();
-   display_init();
+   struct display_driver_t *dd = display_init();
+   display_buffer = display_get(dd);
 
    multicore_fifo_clear_irq();
    multicore_launch_core1(core1_entry);
@@ -321,7 +324,7 @@ int main(void) {
       if (time_reached(next_5s)) {
          mqtt_send_float("home/pico/core_temperature", read_core_temperature());
          mqtt_send_float("home/pico/ambient_light", (3.2 - get_adc_voltage(ADC_Light)) * (100.0/3.2) );
-         display_print();
+         display_print( dd );
          next_5s = delayed_by_ms(next_5s, 5000);
       }
 
@@ -398,6 +401,7 @@ int main(void) {
       set_display_brightness( brightness );
       best_effort_wfe_or_timeout(timeout_time);
    }
+   display_free(dd);
    return 0;
 }
 
