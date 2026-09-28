@@ -2,50 +2,33 @@
 .side_set 1                 ; 1 Side-set pin mapped strictly to CLK (Clock)
 
 .wrap_target
-    ; =========================================================================
-    ; PHASE 1: PREPARE AND RUN BLANKING PASS (Y = 1 means Output Zeroes)
-    ; =========================================================================
-    set y, 1         side 0 
+
     mov osr, null    side 0 ; Populate OSR with absolute zero
-    
-shift_and_latch:
     set x, 31        side 0 ; Loop counter for 32 clock cycles
+blank_loop:
+    out pins, 1      side 0 ; Pulls a zero bit from OSR to the data pin
+    jmp x-- blank_loop side 1 ; Pulse CLK high, repeat 32 times
 
-data_loop:
-    ; Conditional evaluation: If Y is 1, skip 'out' and keep shifting zeroes from OSR.
-    ; If Y is 0, 'out' will automatically pull fresh data from the DMA FIFO queue.
-    jmp !y pull_dma  side 0 
-    out null, 1      side 0 ; Discards 1 bit from OSR, keeping data pin low (0)
-    jmp next_bit     side 0
-pull_dma:
-    out pins, 1      side 0 ; Pulls a true pixel bit from DMA to the data pin
-next_bit:
-    jmp x-- data_loop side 1 ; Pulse CLK high, repeat 32 times
-
-    ; Clock is now parked. Strike Latch Enable (LE) to lock the values in.
-    set pins, 1      side 0 ; Pulse LE HIGH
+    set pins, 1      side 0 ; Pulse LE HIGH to lock in the blank output
     set pins, 0      side 0 ; Pull LE LOW
 
-    ; Determine whether we just finished the Blanking Pass or the True Data Pass
-    jmp !y true_data_done side 0
-
-    ; =========================================================================
-    ; PHASE 2: HANDSHAKE TO ADDRESS MUX (Executes only after Blanking Pass)
-    ; =========================================================================
     irq wait 0       side 0 ; Signal SM1 to switch rows while panel is dark
-        pull block       side 0 ; Wait for and grab fresh DMA data manually
 
-    ; Setup Phase 3: Set Y to 0 so the next pass pulls true pixel data
-    set y, 0         side 0 
-    jmp shift_and_latch side 0 ; Jump back up to run the exact same loop structure
 
-    ; =========================================================================
-    ; PHASE 4: PAUSE FOR DISPLAY PERIOD AND LOOP (Executes after True Data Pass)
-    ; =========================================================================
-true_data_done:
+    pull block       side 0 ; Wait for and grab fresh DMA data manually
+    set x, 31        side 0 ; Loop counter for 32 clock cycles
+data_loop:
+    out pins, 1       side 0 ; Pulls a true pixel bit from DMA to the data pin
+    jmp x-- data_loop side 1 ; Pulse CLK high, repeat 32 times
+
+    set pins, 1      side 0 ; Pulse LE HIGH to lock in the data output
+    set pins, 0      side 0 ; Pull LE LOW
+
+
     set x, 31        side 0 ; Load pause counter
 delay_loop:
-    jmp x-- delay_loop [15] side 0 ; Pulse CLK high, loop 32 times
+    jmp x-- delay_loop [15] side 0
+    
 .wrap
 
 ; A0-A2 should counter over the rows and LE should be pushed hi on each chaneg to latch in the new row data
