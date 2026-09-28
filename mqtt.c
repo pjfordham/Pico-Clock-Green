@@ -3,7 +3,7 @@
 #include "pico/cyw43_arch.h"
 #include "lwip/apps/mqtt.h"
 #include "pico/multicore.h"
-
+#include "pico/bootrom.h"
 
 #define MQTT_BUFFER_SIZE 16
 #define MQTT_TOPIC_SIZE 128
@@ -55,11 +55,21 @@ void mqtt_init() {
 }
 
 
+int itopic = -1;
 static void mqtt_incoming_publish_cb(void *arg,
                                      const char *topic,
                                      u32_t tot_len)
 {
-    printf("Incoming topic: %s\n", topic);
+   if (strcmp(topic, "home/pico/display_brightness/set") == 0) {
+      itopic = 0;
+      printf("Incoming topic: BRIGHTNESS\n");
+   } else if (strcmp(topic, "home/pico/reload") == 0) {
+      printf("Incoming topic: RELOAD\n");
+      itopic = 1;
+   } else {
+      printf("Unrecognized topic.\n");
+      itopic = -1;
+   }
 }
 
 static void mqtt_incoming_data_cb(void *arg,
@@ -67,12 +77,17 @@ static void mqtt_incoming_data_cb(void *arg,
                                   u16_t len,
                                   u8_t flags)
 {
-   brightness = strtol(data, NULL ,10);
-  printf("Incoming payload: %.*s %d\n", len, data, brightness);
-  
+   printf("Incoming payload: %.*s %d\n", len, data, brightness);
+   if (itopic == 0) {
+      brightness = strtol(data, NULL ,10);
+   } else if (itopic == 1 ) {
+      reset_usb_boot(0,0); // reboot
+   } else {
+   }
 }
 
-void    mqtt_publish_cb(void *arg, err_t err)
+
+void mqtt_publish_cb(void *arg, err_t err)
 {
    if (err == ERR_OK) {
       printf("MQTT publish OK\n");
@@ -81,18 +96,39 @@ void    mqtt_publish_cb(void *arg, err_t err)
    }
 }
 
-static void mqtt_subscribe_cb(void *arg,
-                              err_t err)
+void mqtt_subscribe_cb2(void *arg, err_t err)
 {
-    if (err == ERR_OK) {
-        printf("Subscribed to brightness\n");
-    } else {
-        printf("Brightness subscribe failed: %d\n", err);
-    }
+   if (err == ERR_OK) {
+      printf("MQTT publish OK\n");
+   } else {
+      printf("MQTT publish failed: %d\n", err);
+   }
+   mqtt_set_inpub_callback(client, mqtt_incoming_publish_cb,
+                           mqtt_incoming_data_cb, NULL);
+}
 
-    mqtt_set_inpub_callback(client, mqtt_incoming_publish_cb,
-                            mqtt_incoming_data_cb, NULL);
-    }
+void mqtt_subscribe_cb(void *arg, err_t err)
+{
+   if (err == ERR_OK) {
+      printf("MQTT publish OK\n");
+      printf("subscribe brightness: %d\n",mqtt_subscribe(client,
+                                                         "home/pico/display_brightness/set",
+                                                         0,
+                                                         mqtt_subscribe_cb2,
+                                                         NULL));
+
+      printf("subscribe reload: %d\n",mqtt_subscribe(client,
+                                                     "home/pico/reload",
+                                                     0,
+                                                     mqtt_subscribe_cb2,
+                                                     NULL));
+   } else {
+      printf("MQTT publish failed: %d\n", err);
+   }
+   mqtt_set_inpub_callback(client, mqtt_incoming_publish_cb,
+                           mqtt_incoming_data_cb, NULL);
+}
+
 
 void mqtt_connection_cb(mqtt_client_t *client,
                         void *arg,
@@ -105,76 +141,91 @@ void mqtt_connection_cb(mqtt_client_t *client,
 
    printf("MQTT connected\n");
 
-static const char *adc_temp_config =
-   "{"
-   "\"name\":\"Core Temperature\","
-   "\"unique_id\":\"pico_clock_green_adc_temp\","
-   "\"state_topic\":\"home/pico/core_temperature\","
-   "\"device_class\":\"temperature\","
-   "\"state_class\":\"measurement\","
-   "\"unit_of_measurement\":\"°C\","
-   "\"device\":{"
-   "\"identifiers\":[\"pico_clock_green\"],"
-   "\"name\":\"Pico Clock Green\","
-   "\"manufacturer\":\"Raspberry Pi\","
-   "\"model\":\"Pico W\""
-   "}"
-   "}";
+   static const char *adc_temp_config =
+      "{"
+      "\"name\":\"Core Temperature\","
+      "\"unique_id\":\"pico_clock_green_adc_temp\","
+      "\"state_topic\":\"home/pico/core_temperature\","
+      "\"device_class\":\"temperature\","
+      "\"state_class\":\"measurement\","
+      "\"unit_of_measurement\":\"°C\","
+      "\"device\":{"
+      "\"identifiers\":[\"pico_clock_green\"],"
+      "\"name\":\"Pico Clock Green\","
+      "\"manufacturer\":\"Raspberry Pi\","
+      "\"model\":\"Pico W\""
+      "}"
+      "}";
 
-static const char *adc_light_config =
-   "{"
-   "\"name\":\"Ambient Light\","
-   "\"unique_id\":\"pico_clock_green_adc_light\","
-   "\"state_topic\":\"home/pico/ambient_light\","
-   "\"state_class\":\"measurement\","
-   "\"unit_of_measurement\":\"%\","
-   "\"device\":{"
-   "\"identifiers\":[\"pico_clock_green\"],"
-   "\"name\":\"Pico Clock Green\","
-   "\"manufacturer\":\"Raspberry Pi\","
-   "\"model\":\"Pico W\""
-   "}"
-   "}";
+   static const char *adc_light_config =
+      "{"
+      "\"name\":\"Ambient Light\","
+      "\"unique_id\":\"pico_clock_green_adc_light\","
+      "\"state_topic\":\"home/pico/ambient_light\","
+      "\"state_class\":\"measurement\","
+      "\"unit_of_measurement\":\"%\","
+      "\"device\":{"
+      "\"identifiers\":[\"pico_clock_green\"],"
+      "\"name\":\"Pico Clock Green\","
+      "\"manufacturer\":\"Raspberry Pi\","
+      "\"model\":\"Pico W\""
+      "}"
+      "}";
 
-static const char *brightness_config =
-    "{"
-    "\"name\":\"Display Brightness\","
-    "\"unique_id\":\"pico_clock_green_display_brightness\","
-    "\"command_topic\":\"home/pico/display_brightness/set\","
-    "\"state_topic\":\"home/pico/display_brightness/state\","
-    "\"min\":0,"
-    "\"max\":255,"
-    "\"step\":1,"
-    "\"unit_of_measurement\":\"%\","
-    "\"device\":{"
-    "\"identifiers\":[\"pico_clock_green\"],"
-    "\"name\":\"Pico Clock Green\","
-    "\"manufacturer\":\"Raspberry Pi\","
-    "\"model\":\"Pico W\""
-    "}"
-    "}";
+   static const char *brightness_config =
+      "{"
+      "\"name\":\"Display Brightness\","
+      "\"unique_id\":\"pico_clock_green_display_brightness\","
+      "\"command_topic\":\"home/pico/display_brightness/set\","
+      "\"state_topic\":\"home/pico/display_brightness/state\","
+      "\"min\":0,"
+      "\"max\":255,"
+      "\"step\":1,"
+      "\"unit_of_measurement\":\"%\","
+      "\"device\":{"
+      "\"identifiers\":[\"pico_clock_green\"],"
+      "\"name\":\"Pico Clock Green\","
+      "\"manufacturer\":\"Raspberry Pi\","
+      "\"model\":\"Pico W\""
+      "}"
+      "}";
 
-mqtt_publish(client,
-   "homeassistant/sensor/pico_adc_temp/config",
-   adc_temp_config, strlen(adc_temp_config),
-   1, 1, mqtt_publish_cb, NULL);
+   static const char *reload_config =
+      "{"
+      "\"name\":\"Reload\","
+      "\"unique_id\":\"pico_clock_green_reload\","
+      "\"command_topic\":\"home/pico/reload\","
+      "\"payload_press\":\"RELOAD\","
+      "\"device\":{"
+      "\"identifiers\":[\"pico_clock_green\"],"
+      "\"name\":\"Pico Clock Green\","
+      "\"manufacturer\":\"Raspberry Pi\","
+      "\"model\":\"Pico W\""
+      "}"
+      "}";
 
-mqtt_publish(client,
-   "homeassistant/sensor/pico_adc_light/config",
-   adc_light_config, strlen(adc_light_config),
-   1, 1, mqtt_publish_cb, NULL);
+   mqtt_publish(client,
+                "homeassistant/sensor/pico_adc_temp/config",
+                adc_temp_config, strlen(adc_temp_config),
+                1, 1, mqtt_publish_cb, NULL);
 
-mqtt_publish(client,
-   "homeassistant/number/pico_display_brightness/config",
-             brightness_config, strlen(brightness_config),
-   1, 1, mqtt_publish_cb, NULL);
+   mqtt_publish(client,
+                "homeassistant/sensor/pico_adc_light/config",
+                adc_light_config, strlen(adc_light_config),
+                1, 1, mqtt_publish_cb, NULL);
+
+   mqtt_publish(client,
+                "homeassistant/number/pico_display_brightness/config",
+                brightness_config, strlen(brightness_config),
+                1, 1, mqtt_publish_cb, NULL);
+
+   mqtt_publish(client,
+                "homeassistant/button/pico_reload/config",
+                reload_config, strlen(reload_config),
+                1, 1, mqtt_subscribe_cb, NULL);
 
 
-mqtt_subscribe(client,
-               "home/pico/display_brightness/set",
-               0,
-               mqtt_subscribe_cb,
-               NULL);
+
    mqtt_up = 1;
 }
 
