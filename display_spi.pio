@@ -27,7 +27,7 @@ delay:
 
 
 ; A0-A2 should just behave as a 3-bit binary counter advancing one
-; everything it is release from waits by display_data
+; everytime it is released from waits by display_data
 ; Pins A0-A3 are not contigous GPIOs so we can't write them all
 ; with a single instruction.
 ;
