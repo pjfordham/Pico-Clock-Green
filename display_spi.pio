@@ -52,7 +52,7 @@ done:
     wait 1 irq 0 side 0
     irq clear 0  side 1
 
-    jmp x-- A1   side 0
+    jmp x-- A1   side 1
 
     jmp y-- A2   side 1
 
